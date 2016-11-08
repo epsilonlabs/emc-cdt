@@ -1,0 +1,14 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: CDT
+Bundle-SymbolicName: org.eclipse.epsilon.emc.cdt;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: org.eclipse.epsilon.emc.cdt.Activator
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.core.runtime,
+ org.eclipse.cdt,
+ org.eclipse.cdt.core,
+ org.eclipse.cdt.ui,
+ org.eclipse.epsilon.eol.engine
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-ActivationPolicy: lazy
