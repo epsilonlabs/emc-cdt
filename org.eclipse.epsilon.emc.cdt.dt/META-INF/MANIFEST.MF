@@ -7,7 +7,9 @@ Bundle-Activator: org.eclipse.epsilon.emc.cdt.dt.Activator
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.runtime,
  org.eclipse.epsilon.common.dt,
- org.eclipse.epsilon.emc.cdt
+ org.eclipse.epsilon.emc.cdt,
+ org.eclipse.cdt.core,
+ org.eclipse.ui.console
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy
 Export-Package: org.eclipse.epsilon.emc.cdt.dt

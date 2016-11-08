@@ -4,15 +4,21 @@
    <extension
          point="org.eclipse.epsilon.common.dt.modelType">
       <modelType
-            class="org.eclipse.epsilon.emc.cdt.dt.EolModel1"
-            icon="org.eclipse.epsilon.emc.cdt.dt.modelType1"
-            label="org.eclipse.epsilon.emc.cdt.dt.modelType1"
-            type="org.eclipse.epsilon.emc.cdt.dt.modelType1">
+            class="org.eclipse.epsilon.emc.cdt.CdtModel"
+            dialog="org.eclipse.epsilon.emc.cdt.dt.CdtModelConfigurationDialog"
+            icon="icons/cdtmodel.gif"
+            label="Java (CDT) Model"
+            type="CDT">
       </modelType>
    </extension>
    <extension
          point="org.eclipse.epsilon.common.dt.operationContributor">
-      <operationContributor></operationContributor>
+      	<operationContributor
+            class="org.eclipse.epsilon.emc.cdt.ICProjectOperationContributor">
+    	</operationContributor>
+      	<operationContributor
+            class="org.eclipse.epsilon.emc.cdt.ICompilationUnitOperationContributor">
+      	</operationContributor>
    </extension>
 
 
