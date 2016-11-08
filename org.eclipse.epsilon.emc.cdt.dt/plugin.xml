@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.eclipse.epsilon.common.dt.modelType">
+      <modelType
+            class="org.eclipse.epsilon.emc.cdt.dt.EolModel1"
+            icon="org.eclipse.epsilon.emc.cdt.dt.modelType1"
+            label="org.eclipse.epsilon.emc.cdt.dt.modelType1"
+            type="org.eclipse.epsilon.emc.cdt.dt.modelType1">
+      </modelType>
+   </extension>
+   <extension
+         point="org.eclipse.epsilon.common.dt.operationContributor">
+      <operationContributor></operationContributor>
+   </extension>
+
+
+</plugin>
