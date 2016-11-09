@@ -141,7 +141,7 @@ public class CdtModelConfigurationDialog extends AbstractCachedModelConfiguratio
 				else{
 					bindingFlag = false;
 				}
-				System.out.println(bindingFlag +"\t"+ bindingBtn.getSelection());
+//				System.out.println(bindingFlag +"\t"+ bindingBtn.getSelection());
 			}
 			
 			@Override
