@@ -17,6 +17,7 @@ import java.util.List;
 import org.eclipse.cdt.core.dom.ast.IASTNode;
 import org.eclipse.cdt.core.model.ICElement;
 import org.eclipse.cdt.core.model.ICProject;
+import org.eclipse.cdt.internal.core.dom.parser.ASTNode;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.epsilon.common.util.StringProperties;
 import org.eclipse.epsilon.emc.cdt.propertygetter.CdtPropertyGetter;
@@ -30,6 +31,7 @@ import org.eclipse.epsilon.eol.execute.introspection.IPropertyGetter;
 import org.eclipse.epsilon.eol.execute.introspection.IPropertySetter;
 import org.eclipse.epsilon.eol.models.CachedModel;
 import org.eclipse.epsilon.eol.models.IRelativePathResolver;
+import org.eclipse.epsilon.eol.types.EolModelElementType;
 
 public class CdtModel extends CachedModel<Object>{
 
@@ -104,8 +106,7 @@ public class CdtModel extends CachedModel<Object>{
 		try{
 			System.out.println(getClass().getSimpleName() +".hasType(..)");
 			return supportedTypes.contains(type) 
-					|| (Class.forName("org.eclipse.cdt.core.dom.ast." + type) != null);
-//					|| (Class.forName("org.eclipse.cdt.core.model.I"+type) != null);
+					|| (Class.forName("org.eclipse.cdt.core.dom.ast.IAST" + type) != null);
 		} 
 		catch (ClassNotFoundException e) {
 			return false;
@@ -224,9 +225,10 @@ public class CdtModel extends CachedModel<Object>{
 	 */
 	@Override
  	public boolean owns (Object object){
-		if ( (object instanceof ICElement) || (object instanceof IASTNode) ){
-			return true;
-		}
+		System.out.println(object.getClass().getSimpleName() +"\t"+ (object instanceof IASTNode));
+			if ( (object instanceof ICElement) || (object instanceof IASTNode) ){
+				return true;
+			}
 		return false;
 	}
 

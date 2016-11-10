@@ -296,7 +296,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		List<Object> nodes = new ArrayList<Object>(); 
 		try {
 			System.out.println(getClass().getSimpleName() +".getAllofType(..)");
-			findAllNodesInTree(mainAST, 1, Class.forName("org.eclipse.cdt.core.dom.ast." + type), nodes);
+			findAllNodesInTree(mainAST, 1, Class.forName("org.eclipse.cdt.core.dom.ast.IAST" + type), nodes);
 		} 
 		catch (ClassNotFoundException e) {
 			e.printStackTrace();
