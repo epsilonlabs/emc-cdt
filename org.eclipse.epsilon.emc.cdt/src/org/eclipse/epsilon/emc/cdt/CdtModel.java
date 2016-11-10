@@ -19,11 +19,15 @@ import org.eclipse.cdt.core.model.ICElement;
 import org.eclipse.cdt.core.model.ICProject;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.epsilon.common.util.StringProperties;
+import org.eclipse.epsilon.emc.cdt.propertygetter.CdtPropertyGetter;
+import org.eclipse.epsilon.emc.cdt.propertygetter.CdtPropertySetter;
 import org.eclipse.epsilon.eol.exceptions.EolRuntimeException;
 import org.eclipse.epsilon.eol.exceptions.models.EolEnumerationValueNotFoundException;
 import org.eclipse.epsilon.eol.exceptions.models.EolModelElementTypeNotFoundException;
 import org.eclipse.epsilon.eol.exceptions.models.EolModelLoadingException;
 import org.eclipse.epsilon.eol.exceptions.models.EolNotInstantiableModelElementTypeException;
+import org.eclipse.epsilon.eol.execute.introspection.IPropertyGetter;
+import org.eclipse.epsilon.eol.execute.introspection.IPropertySetter;
 import org.eclipse.epsilon.eol.models.CachedModel;
 import org.eclipse.epsilon.eol.models.IRelativePathResolver;
 
@@ -31,7 +35,6 @@ public class CdtModel extends CachedModel<Object>{
 
 	/** list of supported types*/
 	protected List<String> supportedTypes = Arrays.asList("ICElement", "ICProject");
-
 	
 	/** denotes property projects*/
 	public static final String PROPERTY_PROJECT = "cproject";
@@ -48,6 +51,12 @@ public class CdtModel extends CachedModel<Object>{
 	/** Visitor element*/
 	private ReflectiveASTVisitor visitor = null;
 	
+	/** Property getter */
+	protected CdtPropertyGetter propertyGetter = new CdtPropertyGetter();
+
+	/** Property setter */
+	protected CdtPropertySetter propertySetter = new CdtPropertySetter();
+
 	
 	@Override
 	public Object getEnumerationValue(String enumeration, String label) throws EolEnumerationValueNotFoundException {
@@ -55,18 +64,21 @@ public class CdtModel extends CachedModel<Object>{
 		throw new UnsupportedOperationException("getEnumerationValue(..) not Implemented");
 	}
 
+	
 	@Override
  	public String getTypeNameOf(Object instance) {
 		System.out.println(getClass().getSimpleName() +".getTypeNameOf(..)");
 		throw new UnsupportedOperationException("getTypeNameOf(..) not Implemented");
 	}
 
+	
 	@Override
  	public Object getElementById(String id) {
 		System.out.println(getClass().getSimpleName() +".getElementById(..)");
 		throw new UnsupportedOperationException("getElementById(..) not Implemented");
 	}
 
+	
 	@Override
  	public String getElementId(Object instance) {
 		System.out.println(getClass().getSimpleName() +".getElementId(..)");
@@ -86,11 +98,14 @@ public class CdtModel extends CachedModel<Object>{
 		throw new UnsupportedOperationException("isInstantiable(..) not Implemented");
 	}
 
+	
 	@Override
  	public boolean hasType(String type) {
 		try{
-//			System.out.println(getClass().getSimpleName() +".hasType(..)");
-			return supportedTypes.contains(type) || (Class.forName("org.eclipse.cdt.core.dom.ast.IAST" + type) != null);
+			System.out.println(getClass().getSimpleName() +".hasType(..)");
+			return supportedTypes.contains(type) 
+					|| (Class.forName("org.eclipse.cdt.core.dom.ast." + type) != null);
+//					|| (Class.forName("org.eclipse.cdt.core.model.I"+type) != null);
 		} 
 		catch (ClassNotFoundException e) {
 			return false;
@@ -233,6 +248,27 @@ public class CdtModel extends CachedModel<Object>{
  	public boolean store() {
 		System.out.println(getClass().getSimpleName() +".store(..)");
 		throw new UnsupportedOperationException("store(..) not Implemented");
+	}
+
+	
+	/**
+	 * Get property getter
+	 */
+	@Override
+	public IPropertyGetter getPropertyGetter() {
+		System.out.println(getClass().getSimpleName() +".getPropertyGetter(..)");
+		return propertyGetter;
+	}
+	
+	
+	/**
+	 * Get property setter
+	 * @return
+	 */
+	@Override
+	public IPropertySetter getPropertySetter() {
+		System.out.println(getClass().getSimpleName() +".getPropertySetter(..)");
+		return propertySetter;
 	}
 
 	
