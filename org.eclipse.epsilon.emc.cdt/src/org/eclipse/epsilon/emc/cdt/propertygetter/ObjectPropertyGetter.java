@@ -42,7 +42,7 @@ public abstract class ObjectPropertyGetter<T extends IASTNode, R> {
 	 * @param property
 	 * @return
 	 */
-	public boolean appliesTo(Object object, String property) {
+	public boolean appliesTo(Object object, String property) { 
 		return properties.contains(property) && clazz.isInstance(object);
 	}
 	

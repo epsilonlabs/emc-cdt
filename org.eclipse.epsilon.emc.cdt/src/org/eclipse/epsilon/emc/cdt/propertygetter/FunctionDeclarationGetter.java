@@ -20,7 +20,7 @@ public class FunctionDeclarationGetter extends ObjectPropertyGetter<IASTFunction
 	 * @param properties
 	 */
 	public FunctionDeclarationGetter() {
-		super(IASTFunctionDeclarator.class, "name");
+		super(IASTFunctionDeclarator.class, "name", "all");
 	}
 
 	
