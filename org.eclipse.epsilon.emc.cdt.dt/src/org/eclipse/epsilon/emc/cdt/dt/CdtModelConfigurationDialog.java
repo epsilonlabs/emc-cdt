@@ -45,7 +45,7 @@ public class CdtModelConfigurationDialog extends AbstractCachedModelConfiguratio
 	 */
 	@Override
 	protected String getModelName() {
-		return "Java (CDT) Model";
+		return "C/C++ (CDT) Model";
 	}
 
 	
@@ -66,8 +66,13 @@ public class CdtModelConfigurationDialog extends AbstractCachedModelConfiguratio
 		super.createGroups(control);
 		createProjectSelectionGroup(control);
 		createBidingSwitchGroup(control);
+		createLoadStoreOptionsGroup(control);
+		readOnLoadCheckbox.setEnabled(false);
+		readOnLoadLabel.setEnabled(false);
 	}
 
+	
+	
 	
 	/**
 	 * Find projects and create a selection group
@@ -174,6 +179,8 @@ public class CdtModelConfigurationDialog extends AbstractCachedModelConfiguratio
 				bindingBtn.setSelection(false);
 			}
 		}
+		
+		readOnLoadCheckbox.setSelection(true);
 	}
 	
 	
