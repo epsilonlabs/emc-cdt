@@ -7,7 +7,7 @@
             class="org.eclipse.epsilon.emc.cdt.CdtModel"
             dialog="org.eclipse.epsilon.emc.cdt.dt.CdtModelConfigurationDialog"
             icon="icons/cdtmodel.gif"
-            label="Java (CDT) Model"
+            label="C/C++ (CDT) Model"
             type="CDT">
       </modelType>
    </extension>

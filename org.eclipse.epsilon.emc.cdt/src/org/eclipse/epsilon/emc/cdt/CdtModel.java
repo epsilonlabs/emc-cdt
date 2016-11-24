@@ -113,13 +113,11 @@ public class CdtModel extends CachedModel<Object>{
 		}		
 	}
 
-	
 	@Override
- 	protected Collection<? extends Object> allContentsFromModel() {
+	protected Collection<Object> allContentsFromModel() {
 		System.out.println(getClass().getSimpleName() +".allContentsFromModel(..)");
 		throw new UnsupportedOperationException("allContentsFromModel(..) not Implemented");
-	}
-	
+	}	
 	
 	@Override
  	public Collection<Object> getAllOfKind(String kind) throws EolModelElementTypeNotFoundException {
