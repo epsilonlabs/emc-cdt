@@ -16,14 +16,19 @@ import java.rmi.UnexpectedException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.logging.Logger;
 
 import org.eclipse.cdt.core.CCorePlugin;
 import org.eclipse.cdt.core.dom.ast.ASTGenericVisitor;
 import org.eclipse.cdt.core.dom.ast.IASTDeclarator;
+import org.eclipse.cdt.core.dom.ast.IASTFileLocation;
 import org.eclipse.cdt.core.dom.ast.IASTNode;
 import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
+import org.eclipse.cdt.core.dom.ast.IBinding;
+import org.eclipse.cdt.core.dom.ast.IFunction;
 import org.eclipse.cdt.core.index.IIndex;
+import org.eclipse.cdt.core.index.IIndexBinding;
+import org.eclipse.cdt.core.index.IIndexName;
+import org.eclipse.cdt.core.index.IndexFilter;
 import org.eclipse.cdt.core.model.CoreModelUtil;
 import org.eclipse.cdt.core.model.ICElement;
 import org.eclipse.cdt.core.model.ICProject;
@@ -31,6 +36,7 @@ import org.eclipse.cdt.core.model.ISourceRoot;
 import org.eclipse.cdt.core.model.ITranslationUnit;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.PlatformUI;
@@ -51,7 +57,10 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 
 	/** Main AST */
 	IASTTranslationUnit mainAST = null;
-
+	
+	/** Index for this project*/
+	IIndex projectIndex = null;
+	
 	
 	/**
 	 * Class constructor: initialise a ReflectiveASTVisitor
@@ -64,6 +73,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 			this.cproject = project;
 			this.resolveBindings = resolveBindings;
 			findMainFunction();
+			this.projectIndex = CCorePlugin.getIndexManager().getIndex(cproject);
 		} 
 		catch (NoSuchMethodException | UnexpectedException | CoreException | ClassNotFoundException e) {
 			e.printStackTrace();
@@ -140,45 +150,6 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		return null;
 	}
 	
-
-	/**
-	 * Find the source file with main() function
-	 * @param cProject
-	 * @return
-	 * @throws NoSuchMethodException
-	 * @throws UnexpectedException
-	 * @throws CoreException
-	 * @throws ClassNotFoundException 
-	 */
-	public void findMainFunction() throws NoSuchMethodException, UnexpectedException, CoreException, ClassNotFoundException{
-		//get source folders
-		for (ISourceRoot sourceRoot : cproject.getSourceRoots()){
-//			System.out.println(sourceRoot.getLocationURI().getPath());
-			//get all elements
-			for (ICElement element : sourceRoot.getChildren()){
-//				System.out.println(element.getElementName() +"\t"+ element.getClass());
-				//find a .c or cpp file
-				if (element instanceof ITranslationUnit && ((ITranslationUnit) element).isSourceUnit()){
-					ITranslationUnit tu		= (ITranslationUnit) element;
-					IASTTranslationUnit ast = getASTFromtTranslationUnit(tu);
-					IASTNode node = findNodeInTree(ast, 1, Class.forName("org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator"), "main");
-					if (node != null && mainTU == null){
-						mainTU = tu;
-						mainAST = ast;
-					}
-					else if (node != null && mainTU != null){
-						throw new NoSuchMethodException(String.format("Multiple main() methods in project %s", cproject.getProject().getName()));
-					} 
-				}
-				
-			}
-		}
-		
-		if (mainTU ==null)
-			throw new NoSuchMethodException(String.format("main() method not found in project %s", cproject.getProject().getName()));
-		return;
-	}
-	
 	
 	/**
 	 * Get AST from translation unit
@@ -203,14 +174,55 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		ast.accept(this);
 		return ast;
 	}
+
+	
+
+	/**
+	 * Find the source file with main() function
+	 * @param cProject
+	 * @return
+	 * @throws NoSuchMethodException
+	 * @throws UnexpectedException
+	 * @throws CoreException
+	 * @throws ClassNotFoundException 
+	 */
+	public void findMainFunction() throws NoSuchMethodException, UnexpectedException, CoreException, ClassNotFoundException{
+		//get source folders
+		for (ISourceRoot sourceRoot : cproject.getSourceRoots()){
+//			System.out.println(sourceRoot.getLocationURI().getPath());
+			//get all elements
+			for (ICElement element : sourceRoot.getChildren()){
+//				System.out.println(element.getElementName() +"\t"+ element.getClass());
+				//find a .c or cpp file
+				if (element instanceof ITranslationUnit && ((ITranslationUnit) element).isSourceUnit()){
+					ITranslationUnit tu		= (ITranslationUnit) element;
+					IASTTranslationUnit ast = getASTFromtTranslationUnit(tu);
+					IASTNode node = findNodeInTree(ast, 1, Class.forName("org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator"), "main");
+					if (node != null && mainTU == null){
+						mainTU 		= tu;
+						mainAST 	= ast;
+					}
+					else if (node != null && mainTU != null){
+						throw new NoSuchMethodException(String.format("Multiple main() methods in project %s", cproject.getProject().getName()));
+					} 
+				}
+				
+			}
+		}
+		
+		if (mainTU ==null)
+			throw new NoSuchMethodException(String.format("main() method not found in project %s", cproject.getProject().getName()));
+		return;
+	}	
 	
 	
 	///////////////////////////////////////////////
 	//// Tree analyser
 	///////////////////////////////////////////////
 //    private static IASTNode currentNode;
-    private final static Logger LOG = Logger.getLogger("Analyser"); 
+//    private final static Logger LOG = Logger.getLogger("Analyser"); 
 
+    
 	/**
 	 * Find the first node that is instance of <b>targetClass</b> and has the name <b>targetName</b>
      * @param node
@@ -241,7 +253,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 			if (targetClass.isInstance(node)){
 				Method method = targetClass.getMethod("getName", (Class<?>[]) null);
 				if (targetName.equals(method.invoke(node).toString())){
-					System.out.println("FOUND");
+					System.out.println("FOUND: " + targetName);
 					return node;
 				}
 			}
@@ -285,6 +297,52 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 			e.printStackTrace();
 		}
 		return;
+	}
+	
+	
+	protected void findBindingsForFunction(String functionName){
+		try {
+			//get the lock for this index
+			projectIndex.acquireReadLock();
+			//find bindings for the given function name
+			IIndexBinding[] bindings = projectIndex.findBindings(functionName.toCharArray(), 
+																 IndexFilter.ALL_DECLARED, new NullProgressMonitor());
+			//find references for each binding
+			for (IIndexBinding binding : bindings){
+				if (binding instanceof IFunction){
+					
+					//get references
+					IIndexName[] references = projectIndex.findReferences(binding);
+					//do something with these references
+					for (IIndexName reference : references){
+						IASTFileLocation fileLocation = reference.getFileLocation();
+						//print
+						System.out.println(fileLocation.getFileName() +" at offset "+ fileLocation.getNodeOffset());
+						//output name of enclosing function
+						IIndexName function = reference.getEnclosingDefinition();
+						if (function != null){
+							IBinding enclosing = projectIndex.findBinding(function);
+							if (enclosing instanceof IFunction){
+								System.out.print(" within " + enclosing.getName());
+							}
+						}
+					}
+					System.out.println();
+				}
+			}
+		}
+		catch (InterruptedException | CoreException e) {
+			e.printStackTrace();
+		}
+		finally{
+			projectIndex.releaseReadLock();
+		}
+	}
+	
+	
+	
+	private void functionCall(){
+		
 	}
 	
 	

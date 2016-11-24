@@ -55,7 +55,7 @@ public class CdtPropertyGetter extends JavaPropertyGetter {
 			}
 		}
 		
-		//if not, try to guess the the metho
+		//if not, try to guess the the method
 		if (result == null) 
 			result = super.invoke(object, property);
 		

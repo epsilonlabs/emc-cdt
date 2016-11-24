@@ -14,13 +14,18 @@ import org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator;
 
 public class FunctionDeclarationGetter extends ObjectPropertyGetter<IASTFunctionDeclarator, String> {
 
+	private final static String ACCEPT_NAME		= "name";
+//	private final static String ACCEPT_ALL		= "all";
+//	private final static String ACCEPT_SYNTAX	= "syntax";
+
+	
 	/**
 	 * Class constructor
 	 * @param clazz
 	 * @param properties
 	 */
 	public FunctionDeclarationGetter() {
-		super(IASTFunctionDeclarator.class, "name", "all");
+		super(IASTFunctionDeclarator.class, ACCEPT_NAME);//, ACCEPT_ALL, ACCEPT_SYNTAX);
 	}
 
 	
