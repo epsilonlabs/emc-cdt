@@ -23,8 +23,8 @@ import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 
-public class CdtUtil {
-	private CdtUtil() {}
+public class CdtUtilities {
+	private CdtUtilities() {}
 	
 	
 	/**
@@ -102,7 +102,7 @@ public class CdtUtil {
 	 * @throws CoreException 
 	*/
 	public static ICProject getICProject (String projectName) throws CoreException{
-		return CdtUtil.getICProject(getIProject(projectName));
+		return CdtUtilities.getICProject(getIProject(projectName));
 	}
 	
 	/**

@@ -18,7 +18,7 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.epsilon.common.dt.launching.dialogs.AbstractCachedModelConfigurationDialog;
 import org.eclipse.epsilon.emc.cdt.CdtModel;
-import org.eclipse.epsilon.emc.cdt.CdtUtil;
+import org.eclipse.epsilon.emc.cdt.CdtUtilities;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
@@ -108,9 +108,9 @@ public class CdtModelConfigurationDialog extends AbstractCachedModelConfiguratio
 	 * @return
 	 */
 	private Collection<ICProject> getCProjects(){
-		Collection<IProject> projects = CdtUtil.getIProjects();
+		Collection<IProject> projects = CdtUtilities.getIProjects();
 		try {
-			return CdtUtil.getICProjects(new ArrayList<IProject>(projects));
+			return CdtUtilities.getICProjects(new ArrayList<IProject>(projects));
 		} catch (CoreException e) {
 			e.printStackTrace();
 		}

@@ -190,7 +190,7 @@ public class CdtModel extends CachedModel<Object>{
 		//get project name
 		String projectName = properties.getProperty(CdtModel.PROPERTY_PROJECT);
 		try {
-			project = CdtUtil.getICProject(projectName);
+			project = CdtUtilities.getICProject(projectName);
 		} catch (CoreException e) {
 			throw new EolModelLoadingException(e, this);
 		}
