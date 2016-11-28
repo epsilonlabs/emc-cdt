@@ -30,7 +30,7 @@ public class ASTUtilities {
 	 * @param targetName
 	 * @return
 	 */
-	protected static IASTNode findNodeInTree(IASTNode node, int index, Class<?> targetClass, String targetName) {
+	protected static IASTNode findNodeInTree(IASTNode node, int index, Class<?> targetClass, String targetMethod, String targetName) {
 		try {
 			if (targetClass == null || targetName == null)
 				throw new IllegalArgumentException("Target class or target name is NULL!");
@@ -40,7 +40,7 @@ public class ASTUtilities {
 
 			// navigate recursively
 			for (IASTNode childNode : children) {
-				IASTNode tempNode = findNodeInTree(childNode, index + 1, targetClass, targetName);
+				IASTNode tempNode = findNodeInTree(childNode, index + 1, targetClass, targetMethod, targetName);
 				if (tempNode != null)
 					return tempNode;
 			}
@@ -50,7 +50,7 @@ public class ASTUtilities {
 
 			// find node of class targetClass with name targetName
 			if (targetClass.isInstance(node)) {
-				Method method = targetClass.getMethod("getName", (Class<?>[]) null);
+				Method method = targetClass.getMethod(targetMethod, (Class<?>[]) null);
 				if (targetName.equals(method.invoke(node).toString())) {
 					System.out.println("FOUND: " + targetName);
 					return node;
@@ -59,7 +59,7 @@ public class ASTUtilities {
 		} // try
 		catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException
 				| InvocationTargetException e) {
-			// e.printStackTrace();
+			 e.printStackTrace();
 			return null;
 		}
 		return null;

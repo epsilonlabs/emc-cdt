@@ -41,17 +41,14 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 	/** project */
 	protected ICProject cproject = null;
 
-	/** parser */
-	protected IASTTranslationUnit parser = null;
-
 	/** Resolve bindings flag */
 	private boolean resolveBindings = false;
 
 	/** Source file that includes a main function of the c program*/
-	protected ITranslationUnit mainTU = null;
+	private ITranslationUnit mainTU = null;
 
 	/** Main AST */
-	protected IASTTranslationUnit mainAST = null;
+	private IASTTranslationUnit mainAST = null;
 	
 	/** Index for this project*/
 	protected IIndex projectIndex = null;
@@ -119,7 +116,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		// }
 
 		// 3) get an index-based AST for a code reader
-		if (parser == null) {
+		if (mainTU == null) {
 			// Create translation unit for file
 			ITranslationUnit tu = CoreModelUtil.findTranslationUnit(file);
 			if (tu == null) {
@@ -172,7 +169,6 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 	}
 
 	
-
 	/**
 	 * Find the source file with main() function
 	 * @param cProject
@@ -193,7 +189,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 				if (element instanceof ITranslationUnit && ((ITranslationUnit) element).isSourceUnit()){
 					ITranslationUnit tu		= (ITranslationUnit) element;
 					IASTTranslationUnit ast = getASTFromtTranslationUnit(tu);
-					IASTNode node = ASTUtilities.findNodeInTree(ast, 1, Class.forName("org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator"), "main");
+					IASTNode node = ASTUtilities.findNodeInTree(ast, 1, Class.forName("org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator"), "getName", "main");
 					if (node != null && mainTU == null){
 						mainTU 		= tu;
 						mainAST 	= ast;
@@ -211,6 +207,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		return;
 	}	
 	
+	
 	protected boolean saveAST(){
 		try {			
 //			if (mainTU.hasUnsavedChanges())
@@ -223,6 +220,15 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		}
 	}
 		
+	
+	
+	/**
+	 * Return AST
+	 * @return
+	 */
+	protected IASTTranslationUnit getAST(){
+		return this.mainAST;
+	}
 	
 	///////////////////////////////////////////////
 	//// Epsilon specific functions

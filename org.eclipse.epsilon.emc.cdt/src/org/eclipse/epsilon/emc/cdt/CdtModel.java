@@ -50,6 +50,9 @@ public class CdtModel extends CachedModel<Object>{
 	/** Visitor element*/
 	private ReflectiveASTVisitor visitor = null;
 	
+	/** Refactoring element*/
+	private RefactoringAST refactor = null;
+	
 	/** Property getter */
 	protected CdtPropertyGetter propertyGetter = new CdtPropertyGetter();
 
@@ -156,6 +159,7 @@ public class CdtModel extends CachedModel<Object>{
 		project 		= null;
 		resolveBindings = false;
 		visitor 		= null;
+		refactor		= null;
 	}
 
 	
@@ -201,6 +205,9 @@ public class CdtModel extends CachedModel<Object>{
 		//init visitor
 		visitor = new ReflectiveASTVisitor(project, resolveBindings);
 		
+		//init refactor
+		refactor = new RefactoringAST(visitor.getAST());
+		
 		//finally load model
 		load();
 	}
@@ -244,7 +251,10 @@ public class CdtModel extends CachedModel<Object>{
 	@Override
  	public boolean store() {
 		System.out.println(getClass().getSimpleName() +".store()");
-		return visitor.saveAST();
+		refactor.addNewFunction("TESTme");
+		refactor.addNewFunction("TESTme2");
+		return refactor.storeAST();
+		//		return visitor.saveAST();
 	}
 
 	
