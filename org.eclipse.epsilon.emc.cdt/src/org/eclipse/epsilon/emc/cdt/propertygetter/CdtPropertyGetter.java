@@ -31,7 +31,8 @@ public class CdtPropertyGetter extends JavaPropertyGetter {
 	 */
 	public CdtPropertyGetter() {
 		objectPropertyGetters.addAll(Arrays.asList(new ObjectPropertyGetter[]{
-				new FunctionDeclarationGetter()
+				new FunctionDeclarationGetter(),
+				new FunctionCallExpressionGetter()
 				//....
 		}));
 	}
@@ -59,12 +60,7 @@ public class CdtPropertyGetter extends JavaPropertyGetter {
 		if (result == null) 
 			result = super.invoke(object, property);
 		
-		if (result instanceof IASTName) {
-			return result.toString();
-		}
-		else {
 			return result;
-		}
 	}
 
 

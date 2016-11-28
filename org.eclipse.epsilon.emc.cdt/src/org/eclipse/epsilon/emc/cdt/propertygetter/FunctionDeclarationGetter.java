@@ -11,12 +11,14 @@
 package org.eclipse.epsilon.emc.cdt.propertygetter;
 
 import org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTFunctionDefinition;
 
 public class FunctionDeclarationGetter extends ObjectPropertyGetter<IASTFunctionDeclarator, String> {
 
 	private final static String ACCEPT_NAME		= "name";
 //	private final static String ACCEPT_ALL		= "all";
 //	private final static String ACCEPT_SYNTAX	= "syntax";
+	private final static String ACCEPT_NAMESPACE = "namespace";
 
 	
 	/**
@@ -25,12 +27,18 @@ public class FunctionDeclarationGetter extends ObjectPropertyGetter<IASTFunction
 	 * @param properties
 	 */
 	public FunctionDeclarationGetter() {
-		super(IASTFunctionDeclarator.class, ACCEPT_NAME);//, ACCEPT_ALL, ACCEPT_SYNTAX);
+		super(IASTFunctionDeclarator.class);//, ACCEPT_NAME);//, ACCEPT_ALL, ACCEPT_SYNTAX);
 	}
 
 	
 	@Override
 	public String getValue(IASTFunctionDeclarator object, String property) {
+		if (property.equals(ACCEPT_NAMESPACE)){
+			if (object instanceof ICPPASTFunctionDefinition){
+				
+			}
+			return null;
+		}
 		return object.getName().toString();
 	}
 
