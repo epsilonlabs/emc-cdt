@@ -21,14 +21,20 @@ import org.eclipse.cdt.core.CCorePlugin;
 import org.eclipse.cdt.core.dom.ast.ASTGenericVisitor;
 import org.eclipse.cdt.core.dom.ast.IASTDeclarator;
 import org.eclipse.cdt.core.dom.ast.IASTFileLocation;
+import org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator;
+import org.eclipse.cdt.core.dom.ast.IASTFunctionDefinition;
 import org.eclipse.cdt.core.dom.ast.IASTNode;
+import org.eclipse.cdt.core.dom.ast.IASTNode.CopyStyle;
 import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
 import org.eclipse.cdt.core.dom.ast.IBinding;
 import org.eclipse.cdt.core.dom.ast.IFunction;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPNodeFactory;
+import org.eclipse.cdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.cdt.core.index.IIndex;
 import org.eclipse.cdt.core.index.IIndexBinding;
 import org.eclipse.cdt.core.index.IIndexName;
 import org.eclipse.cdt.core.index.IndexFilter;
+import org.eclipse.cdt.core.model.CModelException;
 import org.eclipse.cdt.core.model.CoreModelUtil;
 import org.eclipse.cdt.core.model.ICElement;
 import org.eclipse.cdt.core.model.ICProject;
@@ -38,9 +44,12 @@ import org.eclipse.core.resources.IFile;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.jface.dialogs.MessageDialog;
+import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.PlatformUI;
 
+
+@SuppressWarnings("restriction")
 public class ReflectiveASTVisitor extends ASTGenericVisitor {
 
 	/** project */
@@ -186,7 +195,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 	 * @throws CoreException
 	 * @throws ClassNotFoundException 
 	 */
-	public void findMainFunction() throws NoSuchMethodException, UnexpectedException, CoreException, ClassNotFoundException{
+	private void findMainFunction() throws NoSuchMethodException, UnexpectedException, CoreException, ClassNotFoundException{
 		//get source folders
 		for (ISourceRoot sourceRoot : cproject.getSourceRoots()){
 //			System.out.println(sourceRoot.getLocationURI().getPath());
@@ -338,19 +347,13 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 			projectIndex.releaseReadLock();
 		}
 	}
-	
-	
-	
-	private void functionCall(){
 		
-	}
-	
 	
 	///////////////////////////////////////////////
 	//// Epsilon specific functions
 	///////////////////////////////////////////////
 	
-	public Collection<Object> getAllofType(String type){
+	protected Collection<Object> getAllofType(String type){
 		List<Object> nodes = new ArrayList<Object>(); 
 		try {
 			System.out.println(getClass().getSimpleName() +".getAllofType(..)");

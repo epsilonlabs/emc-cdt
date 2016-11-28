@@ -24,6 +24,9 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 
 public class CdtUtil {
+	private CdtUtil() {}
+	
+	
 	/**
 	 * Get a list of projects for the current workspace
 	 * @return

@@ -13,7 +13,6 @@ package org.eclipse.epsilon.emc.cdt;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-
 import org.eclipse.cdt.core.dom.ast.IASTNode;
 import org.eclipse.cdt.core.model.ICElement;
 import org.eclipse.cdt.core.model.ICProject;
@@ -244,8 +243,8 @@ public class CdtModel extends CachedModel<Object>{
 	 */
 	@Override
  	public boolean store() {
-		System.out.println(getClass().getSimpleName() +".store(..)");
-		throw new UnsupportedOperationException("store(..) not Implemented");
+		System.out.println(getClass().getSimpleName() +".store()");
+		return visitor.saveAST();
 	}
 
 	
