@@ -15,8 +15,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import org.eclipse.cdt.core.index.IIndexFile;
+import org.eclipse.cdt.core.index.IIndexName;
 import org.eclipse.cdt.core.model.CoreModel;
+import org.eclipse.cdt.core.model.CoreModelUtil;
 import org.eclipse.cdt.core.model.ICProject;
+import org.eclipse.cdt.core.model.ITranslationUnit;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.IWorkspaceRoot;
@@ -123,6 +127,21 @@ public class CdtUtilities {
 	}
 	
 	
+	
+	/**
+	 * Given an index name, return the corresponding translation unit
+	 * @see CxxAstUtils.getTranslationUnitFromIndexName(IIndexName decl)
+	 * @param decl
+	 * @return
+	 * @throws CoreException
+	 */
+	public static ITranslationUnit getTranslationUnitFromIndexName(IIndexName decl) throws CoreException {
+		IIndexFile file = decl.getFile();
+		if (file != null) {
+			return CoreModelUtil.findTranslationUnitForLocation(file.getLocation().getURI(), null);	
+		}
+		return null;
+	}
 
 	
 }

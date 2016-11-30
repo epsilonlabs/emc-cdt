@@ -18,6 +18,7 @@ import java.util.List;
 import org.eclipse.cdt.core.CCorePlugin;
 import org.eclipse.cdt.core.dom.ast.ASTGenericVisitor;
 import org.eclipse.cdt.core.dom.ast.IASTDeclarator;
+import org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator;
 import org.eclipse.cdt.core.dom.ast.IASTNode;
 import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
 import org.eclipse.cdt.core.index.IIndex;
@@ -206,11 +207,16 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 			throw new NoSuchMethodException(String.format("main() method not found in project %s", cproject.getProject().getName()));
 		return;
 	}	
+		
 	
-	
+	/**
+	 * Save the ast
+	 * @deprecated
+	 * @return
+	 */
 	protected boolean saveAST(){
 		try {			
-//			if (mainTU.hasUnsavedChanges())
+			if (mainTU.hasUnsavedChanges())
 				mainTU.save(new NullProgressMonitor(), true);
 			return true;
 		} 
@@ -219,7 +225,6 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 			return false;
 		}
 	}
-		
 	
 	
 	/**
@@ -256,7 +261,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 	
 	@Override
 	public int visit(IASTDeclarator declarator) {
-//		if (declarator instanceof IASTFunctionDeclarator){
+		if (declarator instanceof IASTFunctionDeclarator){
 //			System.out.println(declarator.getRawSignature());
 //			if (declarator.getName().toString().equals("main")){
 //				if (mainTU == null)
@@ -269,7 +274,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 //						e.printStackTrace();
 //					}
 //				}
-//			}
+			}
 //		}
 		return PROCESS_CONTINUE;
 	}
