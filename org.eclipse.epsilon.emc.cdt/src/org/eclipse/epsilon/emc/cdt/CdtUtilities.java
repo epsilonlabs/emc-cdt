@@ -10,18 +10,28 @@
  ******************************************************************************/
 package org.eclipse.epsilon.emc.cdt;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 
 import org.eclipse.cdt.core.index.IIndexFile;
 import org.eclipse.cdt.core.index.IIndexName;
+import org.eclipse.cdt.core.model.CModelException;
 import org.eclipse.cdt.core.model.CoreModel;
 import org.eclipse.cdt.core.model.CoreModelUtil;
+import org.eclipse.cdt.core.model.ICContainer;
+import org.eclipse.cdt.core.model.ICElement;
 import org.eclipse.cdt.core.model.ICProject;
+import org.eclipse.cdt.core.model.ISourceRoot;
 import org.eclipse.cdt.core.model.ITranslationUnit;
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
@@ -124,6 +134,111 @@ public class CdtUtilities {
 			}
 		}
 		return sourceProjects;
+	}
+	
+	
+	
+	public static IFile createNewFile (ICProject cproject, String folderName, String filename){
+		try {
+			//check if the project exists and is open, it should be, but check anyway
+			IProject project = cproject.getProject();
+			if (!project.exists())
+				throw new NoSuchElementException ("Project " + project.getName() +" does not exist!");
+			if (!project.isOpen())
+				project.open(null);
+				
+			//get the folder
+			IFolder folder  = project.getFolder(folderName);  
+			if (!folder.exists())
+				folder.create(IResource.NONE, true, null);
+			
+			//check if this directory is a source directory
+			if (!cproject.isOnSourceRoot(folder))
+				throw new IllegalArgumentException("Directory " + folderName + " is not a source directory");
+	
+			//create new IFile
+			IFile file = folder.getFile(filename);
+			if (!file.exists()){
+				InputStream source = new ByteArrayInputStream("".getBytes());
+			    file.create(source, IResource.NONE, null);
+			}
+			return file;
+		} 
+		catch (CoreException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	
+	public static boolean appendToFile (IFile file, String output){
+		try {
+			if (!file.exists())
+				return false;
+			
+			InputStream source = new ByteArrayInputStream(output.getBytes());
+
+			file.appendContents(source, IFile.FORCE, null);
+			return true;
+		} 
+		catch (CoreException e) {
+			e.printStackTrace();
+		}
+		return true;
+	}
+	
+
+		
+	
+	
+	/**
+	 * Returns as List all the translation units for the given project.
+	 * This function considers all the source directories and sub-directories of this projects
+	 * and excludes any translation units whose name is within {@code excludedFiles} array
+	 * @param cproject the current C/C++ project
+	 * @param excludedFiles an array of filenames for which a translation unit <b>won't</b> be generated
+	 * @return
+	 */
+	public static List<ITranslationUnit> getProjectTranslationUnits (ICProject cproject,  String[] excludedFiles) {
+		List<ITranslationUnit> tuList = new ArrayList<ITranslationUnit>();
+		
+		HashSet<String> excludedFilesSet = new HashSet<String>(Arrays.asList(excludedFiles));
+		
+		//get source folders
+		try {
+			for (ISourceRoot sourceRoot : cproject.getSourceRoots()){
+//				System.out.println(sourceRoot.getLocationURI().getPath());
+				//get all elements
+				for (ICElement element : sourceRoot.getChildren()){
+					//if it is a container (i.e., a source folder)
+//					System.out.println(element.getElementName() +"\t"+ element.getElementType() +"\t"+element.getClass());
+					if (element.getElementType() == ICElement.C_CCONTAINER){
+						recursiveContainerTraversal((ICContainer)element, tuList, excludedFilesSet);
+					}
+					else{
+						ITranslationUnit tu		= (ITranslationUnit) element;
+						if (! excludedFilesSet.contains(tu.getFile().getName()))
+							tuList.add(tu);
+					}
+
+				}
+			}
+		} catch (CModelException e) {
+			e.printStackTrace();
+		}
+		return tuList;			
+	}
+	
+	
+	private static void recursiveContainerTraversal (ICContainer container, List<ITranslationUnit> tuList, HashSet<String> excludedFilesSet) throws CModelException{
+		for (ICContainer inContainer : container.getCContainers()){
+			recursiveContainerTraversal(inContainer, tuList, excludedFilesSet);
+		}
+		
+		for (ITranslationUnit tu : container.getTranslationUnits()){
+			if (! excludedFilesSet.contains(tu.getFile().getName()))
+				tuList.add(tu);			
+		}
 	}
 	
 	
