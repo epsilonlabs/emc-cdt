@@ -42,7 +42,7 @@ public class CdtModel extends CachedModel<Object>{
 	public static final String PROPERTY_RESOLVE_BINDINGS = "resolveBindings";
 
 	/** C project*/
-	protected ICProject project = null;
+	protected ICProject cproject = null;
 	
 	/** Resolve bindings flag*/
 	private boolean resolveBindings = false;
@@ -121,7 +121,7 @@ public class CdtModel extends CachedModel<Object>{
 	
 	@Override
  	public Collection<Object> getAllOfKind(String kind) throws EolModelElementTypeNotFoundException {
-		System.out.println(getClass().getSimpleName() +".getAllOfKind(..)");
+//		System.out.println(getClass().getSimpleName() +".getAllOfKind(..)");
 		return super.getAllOfKind(kind);
 	}
 
@@ -134,14 +134,14 @@ public class CdtModel extends CachedModel<Object>{
 	
 	@Override
  	protected Collection<Object> getAllOfKindFromModel(String kind) throws EolModelElementTypeNotFoundException {
-		System.out.println(getClass().getSimpleName() +".getAllOfKindFromModel(..)");
+//		System.out.println(getClass().getSimpleName() +".getAllOfKindFromModel(..)");
 		return getAllOfTypeFromModel(kind);
 	}
 	
 	
 	@Override
  	protected Collection<Object> getAllOfTypeFromModel(String type) throws EolModelElementTypeNotFoundException {
-		System.out.println(getClass().getSimpleName() +".getAllOfTypeFromModel(..)");
+//		System.out.println(getClass().getSimpleName() +".getAllOfTypeFromModel(..)");
 		return visitor.getAllofType(type);
 	}
 
@@ -156,7 +156,7 @@ public class CdtModel extends CachedModel<Object>{
 	@Override
  	protected void disposeModel() {
 //		System.out.println(getClass().getSimpleName() +".disposeModel(..)");
-		project 		= null;
+		cproject 		= null;
 		resolveBindings = false;
 		visitor 		= null;
 		refactor		= null;
@@ -172,7 +172,7 @@ public class CdtModel extends CachedModel<Object>{
 	
 	@Override
  	protected Object getCacheKeyForType(String type) throws EolModelElementTypeNotFoundException {
-		System.out.println(getClass().getSimpleName() +".getCacheKeyForType(..)");
+//		System.out.println(getClass().getSimpleName() +".getCacheKeyForType(..)");
 		return type;
 	}
 
@@ -194,7 +194,7 @@ public class CdtModel extends CachedModel<Object>{
 		//get project name
 		String projectName = properties.getProperty(CdtModel.PROPERTY_PROJECT);
 		try {
-			project = CdtUtilities.getICProject(projectName);
+			cproject = CdtUtilities.getICProject(projectName);
 		} catch (CoreException e) {
 			throw new EolModelLoadingException(e, this);
 		}
@@ -203,10 +203,10 @@ public class CdtModel extends CachedModel<Object>{
 		resolveBindings = Boolean.parseBoolean(properties.getProperty(PROPERTY_RESOLVE_BINDINGS));
 		
 		//init visitor
-		visitor = new ReflectiveASTVisitor(project, resolveBindings);
+		visitor = new ReflectiveASTVisitor(cproject, resolveBindings);
 		
 		//init refactor
-		refactor = new RefactoringAST(visitor.getAST());
+		refactor = new RefactoringAST(cproject, visitor.getAST());
 		
 		//finally load model
 		load();
@@ -250,11 +250,14 @@ public class CdtModel extends CachedModel<Object>{
 	 */
 	@Override
  	public boolean store() {
-		System.out.println(getClass().getSimpleName() +".store()");
-		refactor.addNewFunction("TESTme");
-		refactor.addNewFunction("TESTme2");
-		return refactor.storeAST();
+//		System.out.println(getClass().getSimpleName() +".store()");
+//		refactor.addNewFunction("func");
+//		refactor.replaceFunction("test", "testMe");
+//		refactor.refactorNameSpace("tinyxml2");
+		refactor.refactor(new String[]{"tinyxml2.cpp", "tinyxml2.h"});
+//		return refactor.
 		//		return visitor.saveAST();
+		return true;
 	}
 
 	
