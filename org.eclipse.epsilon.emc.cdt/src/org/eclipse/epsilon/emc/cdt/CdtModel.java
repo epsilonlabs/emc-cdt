@@ -60,7 +60,7 @@ public class CdtModel extends CachedModel<Object>{
 	protected CdtPropertyGetter propertyGetter = new CdtPropertyGetter();
 
 	/** Property setter */
-	protected CdtPropertySetter propertySetter = new CdtPropertySetter();
+	protected CdtPropertySetter propertySetter = new CdtPropertySetter(this);
 
 	
 	@Override
@@ -262,7 +262,7 @@ public class CdtModel extends CachedModel<Object>{
 //		refactor.addNewFunction("func");
 //		refactor.replaceFunction("test", "testMe");
 //		refactor.refactorNameSpace("tinyxml2");
-		refactor.refactor(new String[]{"tinyxml2.cpp", "tinyxml2.h"});
+//		refactor.refactor(new String[]{"tinyxml2.cpp", "tinyxml2.h"});
 //		return refactor.
 		//		return visitor.saveAST();
 		return true;
@@ -289,5 +289,14 @@ public class CdtModel extends CachedModel<Object>{
 		return propertySetter;
 	}
 
+	
+	public void setTranslationUnit(ITranslationUnit tu){
+		try {
+			visitor.setAST(tu);
+		} 
+		catch (UnexpectedException | CoreException e) {
+			e.printStackTrace();
+		}
+	}
 	
 }

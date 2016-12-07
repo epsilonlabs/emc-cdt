@@ -236,6 +236,12 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		return this.mainAST;
 	}
 	
+	
+	protected void setAST(ITranslationUnit tu) throws UnexpectedException, CoreException{
+		this.mainAST = getASTFromtTranslationUnit(tu);
+		this.mainTU  = tu;
+	}
+	
 	///////////////////////////////////////////////
 	//// Epsilon specific functions
 	///////////////////////////////////////////////
