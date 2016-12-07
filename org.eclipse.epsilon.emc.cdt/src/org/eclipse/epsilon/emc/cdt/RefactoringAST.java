@@ -29,6 +29,7 @@ import org.eclipse.cdt.core.dom.ast.IBinding;
 import org.eclipse.cdt.core.dom.ast.IFunction;
 import org.eclipse.cdt.core.dom.ast.IScope;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPClassType;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPConstructor;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPNamespaceScope;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPNodeFactory;
 import org.eclipse.cdt.core.dom.rewrite.ASTRewrite;
@@ -115,6 +116,7 @@ public class RefactoringAST {
 	 * Test function addition
 	 * @param name
 	 */
+	@Deprecated
 	protected void addNewFunction(String name){
 		try {
 			IASTNode node = ASTUtilities.findNodeInTree(mainAST, 1, Class.forName("org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator"), "getName", "test");
@@ -145,12 +147,14 @@ public class RefactoringAST {
 		}
 	}
 	
+
 	
 	/**
 	 * Test function renaming
 	 * @param oldName
 	 * @param newName
 	 */
+	@Deprecated
 	protected void replaceFunction(String oldName, String newName){
 		try {
 			IASTNode node = ASTUtilities.findNodeInTree(mainAST, 1, Class.forName("org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator"), "getName", oldName);
@@ -209,7 +213,7 @@ public class RefactoringAST {
 				//cache the tu & ast pair
 				astCache.put(tu, ast);
 				
-				NameFinderVisitor fcVisitor = new NameFinderVisitor();
+				NameFinderASTVisitor fcVisitor = new NameFinderASTVisitor();
 				ast.accept(fcVisitor);
 				
 				//cache tu & result list
@@ -224,7 +228,7 @@ public class RefactoringAST {
 			System.out.println(astCache.size());
 			System.out.println(libraryCache.size());
 			
-			createRefactoredCode(libraryCache);
+//			createRefactoredCode(libraryCache);
 
 		} 
 		catch (Exception e) {
@@ -233,7 +237,7 @@ public class RefactoringAST {
 	}
 	
 	
-	
+	//TODO: create Delegate pattern to handle changes?
 	private void createRefactoredCode(HashMap<ITranslationUnit, List<IASTName>> libraryCache){
 		try {
 			ITranslationUnit libTU = null;
@@ -243,19 +247,12 @@ public class RefactoringAST {
 				throw new NoSuchFileException("Could not create source file " + myDIR +"/"+ myLIBRARY);
 
 			// Create translation unit for file
-			libTU = CoreModelUtil.findTranslationUnit(file);
-			
-			//for each translation unit get its AST
-//			Set<ITranslationUnit> tuSet = libraryCache.keySet();
-//			for (ITranslationUnit tu : tuSet){
-//				System.out.println(tu.getFile().getName() + Arrays.toString((libraryCache.get(tu).toArray())));
-//				get the list of names from library 
-//				List<IASTName> list = libraryCache.get(tu);
-//				
-//			}
-			
+			libTU = CoreModelUtil.findTranslationUnit(file);			
 			
 			addNameSpace(libTU, myLIBRARY);
+			for (ITranslationUnit tu : libraryCache.keySet()){
+				addFunctionDefinitions (libTU, libraryCache.get(tu));
+			}
 			
 			System.out.println(libTU.getElementName());
 			System.out.println();
@@ -274,37 +271,26 @@ public class RefactoringAST {
 			ASTRewrite rewriter 		= ASTRewrite.create(ast);
 			ICPPNodeFactory nodeFactory = (ICPPNodeFactory)ast.getASTNodeFactory();
 
+			//add header
+//			IAST headerNode = ast.getASTNodeFactory().new
+//			nodeFactory.ne
+//			tu.get
+//			projectIndex
+			
 			IASTNode newNode = nodeFactory.newUsingDirective(nodeFactory.newName("tinyxml2"));
 			rewriter.insertBefore(ast.getTranslationUnit(), null, newNode, null);
 			rewriter.rewriteAST();				
 //			c.perform(new NullProgressMonitor());				
 
-//			ast =  tu.getAST();
-//			rewriter = ASTRewrite.create(ast);
 			IASTNode newNode2 = nodeFactory.newUsingDirective(nodeFactory.newName("std"));
 			rewriter.insertBefore(ast, null, newNode2, null);
 			rewriter.rewriteAST();				
 //			c2.perform(new NullProgressMonitor());			
 			
-
-//			ast =  tu.getAST();
-//			rewriter = ASTRewrite.create(ast);
 			IASTNode newNode4 = nodeFactory.newNamespaceDefinition(nodeFactory.newName("myTinyXmlLib"));
 			rewriter.insertBefore(ast, null, newNode4, null);
 			Change c4 = rewriter.rewriteAST();				
 			c4.perform(new NullProgressMonitor());
-			
-			for (IUsing using : tu.getUsings()){
-//				System.out.print(using.getElementName());
-				using.rename("b", true, new NullProgressMonitor());
-			}
-
-			tu.save(new NullProgressMonitor(), true);
-			for (IUsing using : tu.getUsings()){
-				System.out.print(using.getElementName());
-			}
-
-
 		}
 		catch (CoreException e){
 			e.printStackTrace();
@@ -314,9 +300,46 @@ public class RefactoringAST {
 	
 	
 	
+	private void addFunctionDefinitions (ITranslationUnit tu, List<IASTName> list){
+		try {
+			IASTTranslationUnit ast = tu.getAST();
+			
+			ASTRewrite rewriter 		= ASTRewrite.create(ast);
+			ICPPNodeFactory nodeFactory = (ICPPNodeFactory)ast.getASTNodeFactory();
+
+			for (IASTName name : list){
+				IBinding binding = projectIndex.findBinding(name);
+				
+				IIndexName []defs = projectIndex.findDefinitions(binding);
+				
+				if (binding instanceof ICPPClassType){
+					ICPPClassType aClass = (ICPPClassType)binding;
+					ICPPConstructor constructors[]  = aClass.getConstructors();
+					for (ICPPConstructor constructor : constructors){
+						System.out.println(constructor.toString());
+					}
+					
+//					IASTNode node = nodeFactory.newFunctionDefinition(declSpecifier, declarator, bodyStatement)
+//							IASTNode n 	= nodeFactory.newFunctionDefinition(
+//									((IASTFunctionDefinition)node.getParent()).getDeclSpecifier().copy(CopyStyle.withoutLocations),
+//									nodeFactory.newFunctionDeclarator(nodeFactory.newName(name)),
+//									((IASTFunctionDefinition)node.getParent()).getBody().copy(CopyStyle.withoutLocations)
+//							  );
+
+				}
+				System.out.println(binding);
+			}
+			
+		} 
+		catch (CoreException e) {
+			e.printStackTrace();
+		}
+
+	}
 	
 	
-	private void checkBindings(List<IASTName> namesList) {
+	
+ 	private void checkBindings(List<IASTName> namesList) {
 		//find bindings for all IASTNames in that list
 		for (IASTName name : namesList){
 			//get the binding
@@ -498,21 +521,17 @@ public class RefactoringAST {
 	}
 	
 	
-	
-	private class NameFinderVisitor extends ASTVisitor{
+	private class NameFinderASTVisitor extends ASTVisitor{
 		/**List keeping all function calls **/
 		private List<IASTName> namesList;
 		
-		/** Pairs of  IASTName,IBinding  **/
-		HashMap<IASTNode, IBinding> bindingCache = new HashMap<>();
-
 		//static initialiser: executed when the class is loaded
 		{
 			shouldVisitNames					= true;
 			shouldVisitExpressions 				= true;
 			shouldVisitParameterDeclarations	= true;
 			shouldVisitDeclarations				= true;
-//			should
+//			
 			namesList		= new ArrayList<IASTName>();
 		}
 				
@@ -662,25 +681,7 @@ public class RefactoringAST {
 			}
 			return false;
 		}
-		
-		
-		/**
-		 * This is to capture names like {@code int x};
-		 */
-		@Override
-		public int visit (IASTName name){
-			if ( (name instanceof IASTFunctionCallExpression) 	||
-				 (name instanceof IASTParameterDeclaration)	  	||
-				 (name instanceof IASTNamedTypeSpecifier)	  	||
-				 (name instanceof IASTIdExpression)	  			||
-				 (name instanceof IASTFieldReference)
-				 ){
-			}
-			return PROCESS_CONTINUE;			
-		}
 	}
-	
-	
 	
 	/*
 	@SuppressWarnings("restriction")
