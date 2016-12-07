@@ -14,9 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.cdt.core.dom.ast.IASTNode;
-
-public abstract class ObjectPropertyGetter<T extends IASTNode, R> {
+public abstract class ObjectPropertyGetter<T extends Object, R> {
 	
 	/** Class of this object*/
 	protected Class<?> clazz;

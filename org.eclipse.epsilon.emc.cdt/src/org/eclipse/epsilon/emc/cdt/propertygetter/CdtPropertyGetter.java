@@ -14,8 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.cdt.core.dom.ast.IASTName;
-import org.eclipse.cdt.core.dom.ast.IASTNode;
+import org.eclipse.cdt.core.model.INamespace;
 import org.eclipse.epsilon.eol.exceptions.EolRuntimeException;
 import org.eclipse.epsilon.eol.execute.introspection.java.JavaPropertyGetter;
 
@@ -32,7 +31,9 @@ public class CdtPropertyGetter extends JavaPropertyGetter {
 	public CdtPropertyGetter() {
 		objectPropertyGetters.addAll(Arrays.asList(new ObjectPropertyGetter[]{
 				new FunctionDeclarationGetter(),
-				new FunctionCallExpressionGetter()
+				new FunctionCallExpressionGetter(),
+				new TranslationUnitGetter(),
+				new CElementGetter<Object>(INamespace.class, "name")//generic for all ICElements
 				//....
 		}));
 	}
@@ -51,7 +52,7 @@ public class CdtPropertyGetter extends JavaPropertyGetter {
 			//check if the given object and property combination belong to this class
 			if (objectPropertyGetter.appliesTo(object, property)) {
 				//if so, get the value for this property
-				result = objectPropertyGetter.getValue((IASTNode) object, property);
+				result = objectPropertyGetter.getValue(object, property);
 				break;
 			}
 		}
