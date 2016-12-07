@@ -26,6 +26,7 @@ import org.eclipse.cdt.core.model.CoreModelUtil;
 import org.eclipse.cdt.core.model.ICContainer;
 import org.eclipse.cdt.core.model.ICElement;
 import org.eclipse.cdt.core.model.ICProject;
+import org.eclipse.cdt.core.model.IParent;
 import org.eclipse.cdt.core.model.ISourceRoot;
 import org.eclipse.cdt.core.model.ITranslationUnit;
 import org.eclipse.core.resources.IFile;
@@ -241,6 +242,33 @@ public class CdtUtilities {
 		}
 	}
 	
+	
+	
+	/**
+	 * Returns as List all the translation units for the given project.
+	 * This function considers all the source directories and sub-directories of this projects
+	 * and excludes any translation units whose name is within {@code excludedFiles} array
+	 * @param cproject the current C/C++ project
+	 * @param excludedFiles an array of filenames for which a translation unit <b>won't</b> be generated
+	 * @return
+	 */
+	public static List<Object> getElementsFromProject(IParent parent,  Class<?> clazz, List<Object> list) {
+				
+		try {
+			for (ICElement element : parent.getChildren()){
+					if (clazz.isInstance(element)){
+						list.add(element);
+					}
+					else if (element instanceof IParent && !element.getElementName().equals("Debug")){
+						getElementsFromProject((IParent)element, clazz, list);
+					}				
+			}
+		}
+		catch (CModelException e){
+			e.printStackTrace();
+		}
+		return list;			
+	}
 	
 	
 	/**

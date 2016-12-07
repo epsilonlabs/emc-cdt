@@ -10,12 +10,15 @@
  ******************************************************************************/
 package org.eclipse.epsilon.emc.cdt;
 
+import java.rmi.UnexpectedException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+
 import org.eclipse.cdt.core.dom.ast.IASTNode;
 import org.eclipse.cdt.core.model.ICElement;
 import org.eclipse.cdt.core.model.ICProject;
+import org.eclipse.cdt.core.model.ITranslationUnit;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.epsilon.common.util.StringProperties;
 import org.eclipse.epsilon.emc.cdt.propertygetter.CdtPropertyGetter;
@@ -33,7 +36,7 @@ import org.eclipse.epsilon.eol.models.IRelativePathResolver;
 public class CdtModel extends CachedModel<Object>{
 
 	/** list of supported types*/
-	protected List<String> supportedTypes = Arrays.asList("ICElement", "ICProject");
+	protected List<String> supportedTypes = Arrays.asList("ICElement", "ICProject", "ITranslationUnit");
 	
 	/** denotes property projects*/
 	public static final String PROPERTY_PROJECT = "cproject";
@@ -109,7 +112,12 @@ public class CdtModel extends CachedModel<Object>{
 					|| (Class.forName("org.eclipse.cdt.core.dom.ast.IAST" + type) != null);
 		} 
 		catch (ClassNotFoundException e) {
-			return false;
+			try {
+				return (Class.forName("org.eclipse.cdt.core.dom.ast.cpp.ICPPAST" + type) != null);
+			} catch (ClassNotFoundException e1) {
+//				e1.printStackTrace();
+				return false;
+			}
 		}		
 	}
 

@@ -18,12 +18,15 @@ import java.util.List;
 
 import org.eclipse.cdt.core.CCorePlugin;
 import org.eclipse.cdt.core.dom.ast.ASTGenericVisitor;
+import org.eclipse.cdt.core.dom.ast.ASTVisitor;
+import org.eclipse.cdt.core.dom.ast.IASTDeclaration;
 import org.eclipse.cdt.core.dom.ast.IASTDeclarator;
 import org.eclipse.cdt.core.dom.ast.IASTExpression;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionCallExpression;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator;
 import org.eclipse.cdt.core.dom.ast.IASTNode;
 import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNamespaceDefinition;
 import org.eclipse.cdt.core.index.IIndex;
 import org.eclipse.cdt.core.model.CModelException;
 import org.eclipse.cdt.core.model.CoreModelUtil;
@@ -161,8 +164,8 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		projectIndex = index;
 
 		// get AST
-//		IASTTranslationUnit ast = tu.getAST(index, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
-		IASTTranslationUnit ast = tu.getAST();//, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
+		IASTTranslationUnit ast = tu.getAST(index, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
+//		IASTTranslationUnit ast = tu.getAST();//, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
 		ast.accept(this);
 		return ast;
 	}
@@ -244,12 +247,33 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 			ASTUtilities.findAllNodesInTree(mainAST, 1, Class.forName("org.eclipse.cdt.core.dom.ast.IAST" + type), nodes);
 		} 
 		catch (ClassNotFoundException e) {
-			e.printStackTrace();
+			try {
+				ASTUtilities.findAllNodesInTree(mainAST, 1, Class.forName("org.eclipse.cdt.core.dom.ast.cpp.ICPPAST" + type), nodes);
+			} catch (ClassNotFoundException e1) {
+				try {
+					return getAllofTypeFromCModel(type);
+				} catch (ClassNotFoundException e2) {
+					e2.printStackTrace();
+				}
+			}
 		}
 		return nodes;
 	}
 	
 	
+	
+	private Collection<Object> getAllofTypeFromCModel (String type) throws ClassNotFoundException{
+		List<Object> elements = new ArrayList<Object>();
+		
+		//if I am asking for a project
+		if (Arrays.asList(cproject.getClass().getInterfaces()).contains(Class.forName("org.eclipse.cdt.core.model." + type))){
+			elements.add(cproject);
+		}
+		else{
+			CdtUtilities.getElementsFromProject(cproject, Class.forName("org.eclipse.cdt.core.model." + type), elements);			
+		}
+		return elements;
+	}
 	@Override
 	protected int genericVisit(IASTNode node) {
 //			System.out.println(node.getRawSignature());
