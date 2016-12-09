@@ -8,12 +8,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.cdt.codan.core.cxx.CxxAstUtils;
 import org.eclipse.cdt.core.CCorePlugin;
 import org.eclipse.cdt.core.dom.ast.ASTVisitor;
 import org.eclipse.cdt.core.dom.ast.DOMException;
 import org.eclipse.cdt.core.dom.ast.IASTCompositeTypeSpecifier;
 import org.eclipse.cdt.core.dom.ast.IASTDeclaration;
+import org.eclipse.cdt.core.dom.ast.IASTElaboratedTypeSpecifier;
+import org.eclipse.cdt.core.dom.ast.IASTEnumerationSpecifier;
 import org.eclipse.cdt.core.dom.ast.IASTExpression;
 import org.eclipse.cdt.core.dom.ast.IASTFieldReference;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionCallExpression;
@@ -33,9 +34,10 @@ import org.eclipse.cdt.core.dom.ast.IFunction;
 import org.eclipse.cdt.core.dom.ast.IScope;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTCompositeTypeSpecifier;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTCompositeTypeSpecifier.ICPPASTBaseSpecifier;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTElaboratedTypeSpecifier;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTFunctionDefinition;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNameSpecifier;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNamespaceDefinition;
-import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTUsingDirective;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTVisibilityLabel;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPClassType;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPConstructor;
@@ -72,8 +74,8 @@ public class RefactoringAST {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static final Set REFACTORING_NAMESPACES = new HashSet(Arrays.asList(elements));
 
-	private static final String myLIBRARY = "myTinyXmlLib.cpp";
-	private static final String myDIR = "src/myLibDir";
+	private static final String myLIBRARY = "myTinyxmlLib.h";
+	private static final String myDIR = "src/myLib";
 
 	/** Keep refactoring information*/
 	NamesSet 	namesSet 	 = new NamesSet();
@@ -129,12 +131,18 @@ public class RefactoringAST {
 			assert(namesSet.size() == bindingsSet.size());
 			assert(namesSet.size() == nodesList.size());
 			
+			System.out.println(namesSet.size() +"\t"+ bindingsSet.size() +"\t"+ nodesList.size());
 			for (int i=0; i<namesSet.size(); i++){
 				System.out.println(namesSet.getList().get(i) +"\t"+ bindingsSet.getList().get(i).getClass().getSimpleName());// +"\t"+ nodesList.get(i));
 			}
 
 			//check for library uses within the same library
 			checkReferences();
+
+			System.out.println(namesSet.size() +"\t"+ bindingsSet.size() +"\t"+ nodesList.size());
+			for (int i=0; i<namesSet.size(); i++){
+				System.out.println(namesSet.getList().get(i) +"\t"+ bindingsSet.getList().get(i).getClass().getSimpleName());// +"\t"+ nodesList.get(i));
+			}
 
 			assert(namesSet.size() == bindingsSet.size());
 			assert(namesSet.size() == nodesList.size());
@@ -150,12 +158,14 @@ public class RefactoringAST {
  	
  	private void checkReferences () {
  		try {
- 			BindingsSet bindings = bindingsSet;
+ 			BindingsSet bindings = new BindingsSet();
+ 			bindings.addAll(bindingsSet);
+
 	 		for (IBinding binding : bindings){
  				projectIndex.acquireReadLock();
 	 			if (binding instanceof ICPPClassType){						
 	 				ICPPClassType aClass = (ICPPClassType)binding;
-//	 				checkClassRefs(aClass);
+	 				checkClassInheritance(aClass);
 	 			}
 	 			else if (binding instanceof IEnumeration){
 	 				System.out.println(binding + "\t IEnumeration");
@@ -165,7 +175,7 @@ public class RefactoringAST {
 	 			}
 	 		}	
  		} 
- 		catch (InterruptedException e) {		
+ 		catch (InterruptedException | CoreException e) {		
  			e.printStackTrace();		
  		}
  		finally{
@@ -174,10 +184,10 @@ public class RefactoringAST {
  	}
  	
  	
- 	private void checkClassRefs(ICPPClassType binding) throws CoreException{
+ 	private void checkClassInheritance (ICPPClassType binding) throws CoreException{
 		IIndexName definitions[] = projectIndex.findDefinitions(binding);
 		for (IIndexName def : definitions) {
-			System.out.println(def.getFile());
+//			System.out.println(def.getFile());
 			// for now, just use the first overload found
 			ITranslationUnit tu = CdtUtilities.getTranslationUnitFromIndexName(def);
 			if (tu == null) {
@@ -215,7 +225,8 @@ public class RefactoringAST {
 										bindingsSet.add(b);
 										nodesList.add(node);	
 									}
-									checkClassRefs((ICPPClassType)b);
+									//check recursively
+									checkClassInheritance((ICPPClassType)b);
 								}							
 								else 
 									throw new CoreException(new Status(IStatus.ERROR, "CDT", n.toString() + "is not instanceof IASTName"));
@@ -231,7 +242,6 @@ public class RefactoringAST {
  	}
  	
  	
-	
 	
 	// TODO: create Delegate pattern to handle changes?
 	private void createRefactoredCode (ListSet<IASTName> namesSet, ListSet<IBinding> bindingsSet, List<IASTNode> nodesList) {
@@ -250,89 +260,27 @@ public class RefactoringAST {
 			// get node factory
 			ICPPNodeFactory nodeFactory = (ICPPNodeFactory) libAST.getASTNodeFactory();
 
-			// add include directive
-			IASTName includeDir = nodeFactory.newName("#include \"tinyXML2.h\"");
-			rewriter.insertBefore(libAST, null, includeDir, null);
+			//1) add include directives
+//			IASTName includeDir = nodeFactory.newName("#include \"tinyXML2.h\"");
+//			rewriter.insertBefore(libAST, null, includeDir, null);
 			
-			// add using directive
-			ICPPASTUsingDirective usingDirective = nodeFactory.newUsingDirective(nodeFactory.newName("tinyxml2"));
-			rewriter.insertBefore(libAST, null, usingDirective, null);
+			//2) add using directives
+//			ICPPASTUsingDirective usingDirective = nodeFactory.newUsingDirective(nodeFactory.newName("tinyxml2"));
+//			rewriter.insertBefore(libAST, null, usingDirective, null);
 
-			// add namespace definition
+			//3) add namespace definition
 			ICPPASTNamespaceDefinition nsDef = nodeFactory.newNamespaceDefinition(nodeFactory.newName("mytinyxml2"));
-
 			
-			// add function definitions
-			for (IASTName name : namesSet) {
-				IBinding binding = projectIndex.findBinding(name);
-				if (binding instanceof ICPPClassType) {					
-//					System.out.println("Class:\t" + binding);
-					
-					//create new class instance
-					IASTCompositeTypeSpecifier newClass = nodeFactory.newCompositeTypeSpecifier(ICPPASTCompositeTypeSpecifier.k_class, nodeFactory.
-																			newName(name.toString()) );
-					newClass.addDeclaration(nodeFactory.newVisibilityLabel(ICPPASTVisibilityLabel.v_public));
-					
-										
-					ICPPClassType aClass = (ICPPClassType)binding;
-					for (ICPPConstructor constructor : aClass.getConstructors()){
-						
-						IIndexName[] decls = projectIndex.findDeclarations(constructor);
-						if (decls.length > 0){
-							IIndexName decl    = decls[0];
-							ITranslationUnit tu = CdtUtilities.getTranslationUnitFromIndexName(decl);
-							
-							IASTTranslationUnit ast = null;
-							if (astCache.containsKey(tu)){
-								ast = astCache.get(tu);
-							}
-							else{
-								ast = tu.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
-								astCache.put(tu, ast);
-							}
-							IASTName n = (IASTName) ast.getNodeSelector(null).findEnclosingNode(decl.getNodeOffset(), decl.getNodeLength());
-							IASTNode fdecl = n;
-							while (!(fdecl instanceof IASTSimpleDeclaration)){
-								fdecl =  fdecl.getParent();
-							}
-							assert (fdecl instanceof IASTSimpleDeclaration);						
-							IASTSimpleDeclaration newDeclaration = ((IASTSimpleDeclaration)fdecl).copy(CopyStyle.withLocations);
-							newClass.addMemberDeclaration(newDeclaration);
-						}
-					}
-					
-					for (IASTName name2 : namesSet){
-						if (!name2.equals(name)){
-							IBinding b = projectIndex.findBinding(name2);
-							if (b instanceof ICPPMethod && ((ICPPMethod)b).getClassOwner().equals(aClass)) {
-								IASTDeclaration newDeclaration =  CxxAstUtils.createDeclaration(name2, nodeFactory, projectIndex);
-//								ICPPMethod aMethod = (ICPPMethod)b;
-//								IIndexName[] decls = projectIndex.findDeclarations(aMethod);
-//								if (decls.length > 0){
-//									IIndexName decl    = decls[0];
-//									ITranslationUnit tu = CdtUtilities.getTranslationUnitFromIndexName(decl);
-//									IASTTranslationUnit ast = tu.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
-//									IASTName n = (IASTName) ast.getNodeSelector(null).findEnclosingNode(decl.getNodeOffset(), decl.getNodeLength());
-//									IASTNode fdecl = n;
-//									while (!(fdecl instanceof IASTSimpleDeclaration)){
-//										fdecl =  fdecl.getParent();
-//									}
-//									assert (fdecl instanceof IASTSimpleDeclaration);						
-//									IASTSimpleDeclaration newDeclaration = ((IASTSimpleDeclaration)fdecl).copy(CopyStyle.withLocations);
-									newClass.addMemberDeclaration(newDeclaration);
-//								}
-							}
-						}
-					}
-					
-
-					IASTSimpleDeclaration newDeclaration = nodeFactory.newSimpleDeclaration(newClass);
-					nsDef.addDeclaration(newDeclaration);
-				} 
-
-			}
-
+			//4) create forward declarations
+			refactorForwardDeclarations(nsDef, nodeFactory);
 			
+			//4) Refactor enumerations
+			refactorEnumerations(nsDef);
+			
+			//5) Refactor classes and methods
+			refactorClasses(nsDef, nodeFactory);
+			
+			//6) add namespace to ast
 			rewriter.insertBefore(libAST, null, nsDef, null);
 			rewriter.rewriteAST().perform(new NullProgressMonitor()); 
 		} 
@@ -340,6 +288,186 @@ public class RefactoringAST {
 			e.printStackTrace();
 		}
 	}
+
+	
+	/**
+	 * Create forward declarations
+	 * @param nsDef
+	 * @throws CoreException
+	 */
+	private void refactorForwardDeclarations (ICPPASTNamespaceDefinition nsDef, ICPPNodeFactory nodeFactory) throws CoreException{		
+		for (IBinding binding : bindingsSet){
+			//add forward declaration for classes
+			if (binding instanceof ICPPClassType){
+				IASTName name 							 = nodeFactory.newName(binding.getName());
+				ICPPASTElaboratedTypeSpecifier specifier = nodeFactory.newElaboratedTypeSpecifier(ICPPASTCompositeTypeSpecifier.k_class, name);				
+				IASTSimpleDeclaration declaration		 = nodeFactory.newSimpleDeclaration(specifier);
+				nsDef.addDeclaration(declaration);
+			}
+		}
+	}
+
+	
+	
+	/**
+	 * Refactor enumeration
+	 * @param nsDef
+	 * @throws CoreException
+	 */
+	private void refactorEnumerations (ICPPASTNamespaceDefinition nsDef) throws CoreException{
+		List<Integer> elementsToRemove = new ArrayList<Integer>();
+		
+		for (int index=0; index<namesSet.size(); index++){
+			IASTName name 	 = namesSet.getList().get(index);
+			IBinding binding = bindingsSet.getList().get(index);
+			
+			//do something with the enumeration
+			if (binding instanceof IEnumeration){
+				//add index to the list to be removed
+				elementsToRemove.add(index);
+				
+				//get enumeration binding
+				IEnumeration enumeration = (IEnumeration)binding;
+				
+				//find definitions
+				IIndexName[] defs = projectIndex.findDefinitions(enumeration);
+				
+				if (defs.length > 0){
+					IIndexName def    = defs[0];
+				
+					//find translation unit & corresponding ast, cache ast if necessary
+					ITranslationUnit tu = CdtUtilities.getTranslationUnitFromIndexName(def);
+					IASTTranslationUnit ast = null;
+					if (astCache.containsKey(tu)){
+						ast = astCache.get(tu);
+					}
+					else{
+						ast = tu.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
+						astCache.put(tu, ast);
+					}
+					
+					//find enumeration 
+					IASTName n = (IASTName) ast.getNodeSelector(null).findEnclosingNode(def.getNodeOffset(), def.getNodeLength());
+					IASTNode fdecl = n;
+					while (!(fdecl instanceof IASTSimpleDeclaration)){
+						fdecl =  fdecl.getParent();
+					}
+					assert (fdecl instanceof IASTSimpleDeclaration);						
+					IASTSimpleDeclaration enumDeclaration = ((IASTSimpleDeclaration)fdecl).copy(CopyStyle.withLocations);
+					
+					//append enumeration to namespace
+					nsDef.addDeclaration(enumDeclaration);
+				}
+			}
+		}
+		
+		//remove enumerations from lists
+		for (int index : elementsToRemove){
+			namesSet.getList().remove(index);
+			bindingsSet.getList().remove(index);
+			nodesList.remove(index);
+		}
+	}
+	
+	
+	/**
+	 * Refactor classes and methods
+	 * @param nsDef
+	 * @param nodeFactory
+	 * @throws CoreException
+	 */
+	private void refactorClasses (ICPPASTNamespaceDefinition nsDef, ICPPNodeFactory nodeFactory) throws CoreException{
+		for (int i=0; i<namesSet.size(); i++){
+			IASTName name 	 = namesSet.getList().get(i);
+			IBinding binding = bindingsSet.getList().get(i);//projectIndex.findBinding(name);
+			
+			if (binding instanceof ICPPClassType) {					
+				
+				//create new class instance
+				IASTCompositeTypeSpecifier newClass = nodeFactory.newCompositeTypeSpecifier(ICPPASTCompositeTypeSpecifier.k_class, nodeFactory.
+																		newName(name.toString()) );
+				newClass.addDeclaration(nodeFactory.newVisibilityLabel(ICPPASTVisibilityLabel.v_public));
+				
+									
+				ICPPClassType aClass = (ICPPClassType)binding;
+				for (ICPPConstructor constructor : aClass.getConstructors()){
+					
+					IIndexName[] decls = projectIndex.findDeclarations(constructor);
+					if (decls.length > 0){
+						IIndexName decl    = decls[0];
+						ITranslationUnit tu = CdtUtilities.getTranslationUnitFromIndexName(decl);
+						
+						IASTTranslationUnit ast = null;
+						if (astCache.containsKey(tu)){
+							ast = astCache.get(tu);
+						}
+						else{
+							ast = tu.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
+							astCache.put(tu, ast);
+						}
+						IASTName n = (IASTName) ast.getNodeSelector(null).findEnclosingNode(decl.getNodeOffset(), decl.getNodeLength());
+						IASTNode fdecl = n;
+						while (!(fdecl instanceof IASTSimpleDeclaration)){
+							fdecl =  fdecl.getParent();
+						}
+						assert (fdecl instanceof IASTSimpleDeclaration);						
+						IASTSimpleDeclaration newDeclaration = ((IASTSimpleDeclaration)fdecl).copy(CopyStyle.withLocations);
+						newClass.addMemberDeclaration(newDeclaration);
+					}
+				}
+				
+				
+				for (int j=0; j<namesSet.size(); j++){
+					IASTName name2 	 = namesSet.getList().get(j);
+					
+					if (!name2.equals(name)){
+						IBinding b = bindingsSet.getList().get(j);
+						if (b instanceof ICPPMethod && ((ICPPMethod)b).getClassOwner().equals(aClass)) {
+							ICPPMethod aMethod = (ICPPMethod)b;
+							IIndexName[] decls = projectIndex.findNames(aMethod, IIndex.FIND_DECLARATIONS_DEFINITIONS);// Declarations(aMethod);
+							if (decls.length > 0){
+								System.out.println(Arrays.toString(decls));
+								IIndexName decl    = decls[0];
+
+								ITranslationUnit tu = CdtUtilities.getTranslationUnitFromIndexName(decl);
+								
+								IASTTranslationUnit ast = null;
+								if (astCache.containsKey(tu)){
+									ast = astCache.get(tu);
+								}
+								else{
+									ast = tu.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
+									astCache.put(tu, ast);
+								}
+
+								IASTName n = (IASTName) ast.getNodeSelector(null).findEnclosingNode(decl.getNodeOffset(), decl.getNodeLength());
+								IASTNode fdecl = n;
+								while ( (!(fdecl instanceof IASTSimpleDeclaration)) && (!(fdecl instanceof ICPPASTFunctionDefinition))){
+									fdecl =  fdecl.getParent();
+								}
+								assert (fdecl instanceof IASTSimpleDeclaration || fdecl instanceof IASTFunctionDefinition);
+								if (fdecl instanceof IASTSimpleDeclaration){
+									IASTSimpleDeclaration newDeclaration = ((IASTSimpleDeclaration)fdecl).copy(CopyStyle.withLocations);
+									newClass.addMemberDeclaration(newDeclaration);
+								}
+								else{
+									ICPPASTFunctionDefinition newDefinition = ((ICPPASTFunctionDefinition)fdecl).copy(CopyStyle.withLocations);
+									newDefinition.setBody(nodeFactory.newCompoundStatement());
+									newClass.addMemberDeclaration(newDefinition);
+								}
+							}
+						}
+					}
+				}
+				
+
+				IASTSimpleDeclaration newDeclaration = nodeFactory.newSimpleDeclaration(newClass);
+				nsDef.addDeclaration(newDeclaration);
+			}
+		}
+			
+	}
+	
 	
 	
 	private class NameFinderASTVisitor extends ASTVisitor {
