@@ -250,14 +250,18 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		List<Object> nodes = new ArrayList<Object>(); 
 		try {
 //			System.out.println(getClass().getSimpleName() +".getAllofType(..)");
+			//check if it is of type IAST
 			ASTUtilities.findAllNodesInTree(mainAST, 1, Class.forName("org.eclipse.cdt.core.dom.ast.IAST" + type), nodes);
 		} 
 		catch (ClassNotFoundException e) {
 			try {
+				//check if its of type ICPPAST
 				ASTUtilities.findAllNodesInTree(mainAST, 1, Class.forName("org.eclipse.cdt.core.dom.ast.cpp.ICPPAST" + type), nodes);
 			} catch (ClassNotFoundException e1) {
 				try {
-					return getAllofTypeFromCModel(type);
+					//check if it is instance of CElement
+					Class<?> clazz = Class.forName("org.eclipse.cdt.core.model." + type);
+					return getAllofTypeFromCModel(clazz);
 				} catch (ClassNotFoundException e2) {
 					e2.printStackTrace();
 				}
@@ -268,18 +272,20 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 	
 	
 	
-	private Collection<Object> getAllofTypeFromCModel (String type) throws ClassNotFoundException{
+	@SuppressWarnings("rawtypes")
+	private Collection<Object> getAllofTypeFromCModel (Class clazz) throws ClassNotFoundException{
 		List<Object> elements = new ArrayList<Object>();
 		
 		//if I am asking for a project
-		if (Arrays.asList(cproject.getClass().getInterfaces()).contains(Class.forName("org.eclipse.cdt.core.model." + type))){
+		if (Arrays.asList(cproject.getClass().getInterfaces()).contains(clazz)){
 			elements.add(cproject);
 		}
 		else{
-			CdtUtilities.getElementsFromProject(cproject, Class.forName("org.eclipse.cdt.core.model." + type), elements);			
+			CdtUtilities.getElementsFromProject(cproject, clazz, elements);			
 		}
 		return elements;
 	}
+	
 	@Override
 	protected int genericVisit(IASTNode node) {
 //			System.out.println(node.getRawSignature());

@@ -246,14 +246,11 @@ public class CdtUtilities {
 	
 	/**
 	 * Returns as List all the translation units for the given project.
-	 * This function considers all the source directories and sub-directories of this projects
-	 * and excludes any translation units whose name is within {@code excludedFiles} array
+	 * This function considers all the source directories and sub-directories of this project
 	 * @param cproject the current C/C++ project
-	 * @param excludedFiles an array of filenames for which a translation unit <b>won't</b> be generated
 	 * @return
 	 */
-	public static List<Object> getElementsFromProject(IParent parent,  Class<?> clazz, List<Object> list) {
-				
+	public static List<Object> getElementsFromProject(IParent parent,  Class<?> clazz, List<Object> list) {				
 		try {
 			for (ICElement element : parent.getChildren()){
 					if (clazz.isInstance(element)){
