@@ -187,26 +187,9 @@ public class RefactoringAST {
  	private void checkClassInheritance (ICPPClassType binding) throws CoreException{
 		IIndexName definitions[] = projectIndex.findDefinitions(binding);
 		for (IIndexName def : definitions) {
-//			System.out.println(def.getFile());
-			// for now, just use the first overload found
-			ITranslationUnit tu = CdtUtilities.getTranslationUnitFromIndexName(def);
-			if (tu == null) {
-				continue;
-			}
+
+			IASTNode fdecl = findNodeFromIndex(def, ICPPASTCompositeTypeSpecifier.class);
 			
-			IASTTranslationUnit ast = null;
-			if (astCache.containsKey(tu)) {
-				ast = astCache.get(tu);
-			} else {
-				ast = tu.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
-				astCache.put(tu, ast);
-			}
-			
-			IASTName name = (IASTName) ast.getNodeSelector(null).findEnclosingNode(def.getNodeOffset(), def.getNodeLength());
-			IASTNode fdecl = name;
-			while ( (fdecl!=null) && (!(fdecl instanceof ICPPASTCompositeTypeSpecifier)) ) {
-				fdecl = fdecl.getParent();
-			}
 			if (fdecl != null){
 //				System.out.println(fdecl.getRawSignature());
 				final IASTNode node = fdecl; 
@@ -318,7 +301,6 @@ public class RefactoringAST {
 		List<Integer> elementsToRemove = new ArrayList<Integer>();
 		
 		for (int index=0; index<namesSet.size(); index++){
-			IASTName name 	 = namesSet.getList().get(index);
 			IBinding binding = bindingsSet.getList().get(index);
 			
 			//do something with the enumeration
@@ -334,25 +316,9 @@ public class RefactoringAST {
 				
 				if (defs.length > 0){
 					IIndexName def    = defs[0];
-				
-					//find translation unit & corresponding ast, cache ast if necessary
-					ITranslationUnit tu = CdtUtilities.getTranslationUnitFromIndexName(def);
-					IASTTranslationUnit ast = null;
-					if (astCache.containsKey(tu)){
-						ast = astCache.get(tu);
-					}
-					else{
-						ast = tu.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
-						astCache.put(tu, ast);
-					}
 					
-					//find enumeration 
-					IASTName n = (IASTName) ast.getNodeSelector(null).findEnclosingNode(def.getNodeOffset(), def.getNodeLength());
-					IASTNode fdecl = n;
-					while (!(fdecl instanceof IASTSimpleDeclaration)){
-						fdecl =  fdecl.getParent();
-					}
-					assert (fdecl instanceof IASTSimpleDeclaration);						
+					IASTNode fdecl = findNodeFromIndex(def, IASTSimpleDeclaration.class);
+					
 					IASTSimpleDeclaration enumDeclaration = ((IASTSimpleDeclaration)fdecl).copy(CopyStyle.withLocations);
 					
 					//append enumeration to namespace
@@ -362,6 +328,7 @@ public class RefactoringAST {
 		}
 		
 		//remove enumerations from lists
+		//FIXME problem with nodesList (not used but should be fixed)
 		for (int index : elementsToRemove){
 			namesSet.getList().remove(index);
 			bindingsSet.getList().remove(index);
@@ -386,32 +353,27 @@ public class RefactoringAST {
 				//create new class instance
 				IASTCompositeTypeSpecifier newClass = nodeFactory.newCompositeTypeSpecifier(ICPPASTCompositeTypeSpecifier.k_class, nodeFactory.
 																		newName(name.toString()) );
+//						newClass.
 				newClass.addDeclaration(nodeFactory.newVisibilityLabel(ICPPASTVisibilityLabel.v_public));
 				
 									
 				ICPPClassType aClass = (ICPPClassType)binding;
 				for (ICPPConstructor constructor : aClass.getConstructors()){
-					
-					IIndexName[] decls = projectIndex.findDeclarations(constructor);
+										
+					IIndexName[] decls = projectIndex.findNames(constructor, IIndex.FIND_DECLARATIONS); //. Declarations(constructor);
+					for (IIndexName decl : decls){
+						System.out.println(decl.getFile() +"\t");
+						IASTNode n = findNodeFromIndex(decl, IASTSimpleDeclaration.class);
+						System.out.println(n.getRawSignature());
+					}
+
 					if (decls.length > 0){
 						IIndexName decl    = decls[0];
-						ITranslationUnit tu = CdtUtilities.getTranslationUnitFromIndexName(decl);
 						
-						IASTTranslationUnit ast = null;
-						if (astCache.containsKey(tu)){
-							ast = astCache.get(tu);
-						}
-						else{
-							ast = tu.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
-							astCache.put(tu, ast);
-						}
-						IASTName n = (IASTName) ast.getNodeSelector(null).findEnclosingNode(decl.getNodeOffset(), decl.getNodeLength());
-						IASTNode fdecl = n;
-						while (!(fdecl instanceof IASTSimpleDeclaration)){
-							fdecl =  fdecl.getParent();
-						}
-						assert (fdecl instanceof IASTSimpleDeclaration);						
+						IASTNode fdecl = findNodeFromIndex(decl, IASTSimpleDeclaration.class);
+
 						IASTSimpleDeclaration newDeclaration = ((IASTSimpleDeclaration)fdecl).copy(CopyStyle.withLocations);
+
 						newClass.addMemberDeclaration(newDeclaration);
 					}
 				}
@@ -469,6 +431,47 @@ public class RefactoringAST {
 	}
 	
 	
+	@SuppressWarnings("rawtypes")
+	private IASTNode findNodeFromIndex(IIndexName indexName, Class...classes){
+		try {
+			//find translation unit & corresponding ast, cache ast if necessary
+			ITranslationUnit tu;
+			tu = CdtUtilities.getTranslationUnitFromIndexName(indexName);
+			IASTTranslationUnit ast = null;
+			if (astCache.containsKey(tu)){
+				ast = astCache.get(tu);
+			}
+			else{
+				ast = tu.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
+				astCache.put(tu, ast);
+			}
+			
+			//find enumeration 
+			IASTName name = (IASTName) ast.getNodeSelector(null).findEnclosingNode(indexName.getNodeOffset(), indexName.getNodeLength());
+			IASTNode node = name;
+			
+			while ( (node != null) && !(nodeIsInstance(classes, node)) ){
+				node =  node.getParent();
+			}
+			assert (nodeIsInstance(classes, node));
+			return node;
+		} 
+		catch (CoreException e){
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	
+	@SuppressWarnings("rawtypes")
+	private boolean nodeIsInstance (Class [] classes, IASTNode node){
+		for (Class clazz: classes){
+			if (clazz.isInstance(node))
+				return true;
+		}
+		return false;
+	}
+	
 	
 	private class NameFinderASTVisitor extends ASTVisitor {
 		/** List keeping all important IASTNames**/
@@ -486,10 +489,10 @@ public class RefactoringAST {
 
 		// static initialiser: executed when the class is loaded
 		{
-			shouldVisitNames = true;
-			shouldVisitExpressions = true;
-			shouldVisitParameterDeclarations = true;
-			shouldVisitDeclarations = true;
+			shouldVisitNames 					= true;
+			shouldVisitExpressions				= true;
+			shouldVisitParameterDeclarations	= true;
+			shouldVisitDeclarations 			= true;
 			//
 			namesSet 		= new NamesSet();
 			bindingsSet  	= new BindingsSet();
@@ -498,23 +501,11 @@ public class RefactoringAST {
 					
 		}
 
-		private NamesSet getNamesSet() {
-			return this.namesSet;
-		}
-		
-		private BindingsSet getBindingsSet(){
-			return this.bindingsSet;
-		}
-		
-		private List<IASTName> getNamesList() {
-			return this.namesList;
-		}
 
 		private boolean libraryCallsExist(){
 			return namesSet.size()>0;
 		}
 
-		
 		
 		/**
 		 * This is to capture (1) functions that belong to a class: e.g.,
@@ -541,8 +532,8 @@ public class RefactoringAST {
 				name = fieldRef.getFieldName();
 				node = fieldRef;
 			}
-			// Function that *do not* belong to a class: e.g., printf("%s",
-			// filename);
+			// Functions that *do not* belong to a class: 
+			//e.g., printf("%s", filename);
 			else if (funcExpression instanceof IASTIdExpression) {
 				// get the function name: e.g., printf
 				IASTIdExpression idExp = (IASTIdExpression) funcExpression;
@@ -555,10 +546,11 @@ public class RefactoringAST {
 				// get the binding
 				IBinding binding = name.resolveBinding();
 				// check whether this binding is part of the legacy library
-				boolean inLibrary = checkBinding(binding);
-				if (inLibrary){
-					appendToLists(name, binding, node);
-				}
+				checkBinding(name, binding, node);
+//				boolean inLibrary = checkBinding(binding);
+//				if (inLibrary){
+//					appendToLists(name, binding, node);
+//				}
 			}
 			return PROCESS_CONTINUE;
 		}
@@ -580,10 +572,11 @@ public class RefactoringAST {
 			IBinding binding = declSpecifierName.resolveBinding();
 
 			// check whether this binding is part of the legacy library
-			boolean inLibrary = checkBinding(binding);
-			if (inLibrary) {
-				appendToLists(declSpecifierName, binding, pDecl);
-			}
+			checkBinding(declSpecifierName, binding, pDecl);
+//			boolean inLibrary = checkBinding(binding);
+//			if (inLibrary) {
+//				appendToLists(declSpecifierName, binding, pDecl);
+//			}
 
 			return PROCESS_CONTINUE;
 		}
@@ -608,16 +601,17 @@ public class RefactoringAST {
 			IBinding binding = declSpecifierName.resolveBinding();
 
 			// check whether this binding is part of the legacy library
-			boolean inLibrary = checkBinding(binding);
-			if (inLibrary){
-				appendToLists(declSpecifierName, binding, simpleDecl);
-			}
+			checkBinding(declSpecifierName, binding, simpleDecl);
+//			boolean inLibrary = checkBinding(binding);
+//			if (inLibrary){
+//				appendToLists(declSpecifierName, binding, simpleDecl);
+//			}
 
 			return PROCESS_CONTINUE;
 		}
 
 		
-		private boolean checkBinding(IBinding binding) {
+		private void checkBinding(IASTName name, IBinding binding, IASTNode node) {
 			try {
 				
 				// while not reached a namespace scope
@@ -629,12 +623,13 @@ public class RefactoringAST {
 
 				if ((scope.getScopeName() != null)
 						&& (REFACTORING_NAMESPACES.contains(scope.getScopeName().toString())))
-					return true;
+					appendToLists(name, binding, node);
+//					return true;
 
 			} catch (DOMException e) {
 				e.printStackTrace();
 			}
-			return false;
+//			return false;
 		}
 		
 		
