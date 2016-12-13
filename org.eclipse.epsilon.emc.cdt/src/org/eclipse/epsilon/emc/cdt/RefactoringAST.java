@@ -12,20 +12,24 @@ import java.util.Set;
 import org.eclipse.cdt.core.CCorePlugin;
 import org.eclipse.cdt.core.dom.ast.ASTVisitor;
 import org.eclipse.cdt.core.dom.ast.DOMException;
-import org.eclipse.cdt.core.dom.ast.IASTCompositeTypeSpecifier;
+import org.eclipse.cdt.core.dom.ast.IASTCompoundStatement;
 import org.eclipse.cdt.core.dom.ast.IASTDeclSpecifier;
 import org.eclipse.cdt.core.dom.ast.IASTDeclaration;
+import org.eclipse.cdt.core.dom.ast.IASTEnumerationSpecifier;
 import org.eclipse.cdt.core.dom.ast.IASTExpression;
 import org.eclipse.cdt.core.dom.ast.IASTFieldReference;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionCallExpression;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionDeclarator;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionDefinition;
 import org.eclipse.cdt.core.dom.ast.IASTIdExpression;
+import org.eclipse.cdt.core.dom.ast.IASTLiteralExpression;
 import org.eclipse.cdt.core.dom.ast.IASTName;
 import org.eclipse.cdt.core.dom.ast.IASTNamedTypeSpecifier;
 import org.eclipse.cdt.core.dom.ast.IASTNode;
 import org.eclipse.cdt.core.dom.ast.IASTNode.CopyStyle;
 import org.eclipse.cdt.core.dom.ast.IASTParameterDeclaration;
+import org.eclipse.cdt.core.dom.ast.IASTReturnStatement;
+import org.eclipse.cdt.core.dom.ast.IASTSimpleDeclSpecifier;
 import org.eclipse.cdt.core.dom.ast.IASTSimpleDeclaration;
 import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
 import org.eclipse.cdt.core.dom.ast.IBinding;
@@ -34,13 +38,18 @@ import org.eclipse.cdt.core.dom.ast.IFunction;
 import org.eclipse.cdt.core.dom.ast.IScope;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTCompositeTypeSpecifier;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTCompositeTypeSpecifier.ICPPASTBaseSpecifier;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTConstructorChainInitializer;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTElaboratedTypeSpecifier;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTFunctionDeclarator;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTFunctionDefinition;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNameSpecifier;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNamedTypeSpecifier;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNamespaceDefinition;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTQualifiedName;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTVisibilityLabel;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPClassType;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPConstructor;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPEnumeration;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPMember;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPMethod;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPNamespaceScope;
@@ -75,10 +84,10 @@ public class RefactoringAST {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static final Set REFACTORING_NAMESPACES = new HashSet(Arrays.asList(elements));
 
-	private static final String myLIBRARYhpp = "myTinyxmlLib.h";
-	private static final String myLIBRARYcpp = "myTinyxmlLib.cpp";
-	private static final String myNAMESPACE  = "myrinyxml2";
-	private static final String myDIR        = "src/myLib";
+	private static final String myLIBRARYhpp = "LibXML.h";
+	private static final String myLIBRARYcpp = "LibXML.cpp";
+	private static final String myNAMESPACE  = "libxml";
+	private static final String myDIR        = "src/LibXML";
 
 	/** Keep refactoring information*/
 	NamesSet 	namesSet 	 = new NamesSet();
@@ -149,10 +158,14 @@ public class RefactoringAST {
 			}
 
 			//find mappings class - members
-			HashMap<ICPPClassType, List<ICPPMember>> classMembersMap = createClassMembersMapping();
+			HashMap<ICPPClassType, List<ICPPMember>> classMembersMap = null; 
+			classMembersMap = createClassMembersMapping();
 
-			//create refactored code
+			//create header file
 			createHeader(classMembersMap);
+
+			//create source file
+			createSource(classMembersMap);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -264,15 +277,61 @@ public class RefactoringAST {
 			//4) create forward declarations
 			refactorForwardDeclarations(nsDef, nodeFactory);
 			
-			//4) Refactor enumerations
+			//5) Refactor enumerations
 			refactorEnumerations(nsDef);
 			
-			//5) Refactor classes and methods
-//			refactorClasses(nsDef, nodeFactory);
+			//6) Refactor classes and methods
 			refactorClasses(nodeFactory, classMembersMap, nsDef);
 			
-			//6) add namespace to ast
+			//7) add namespace to ast
 			rewriter.insertBefore(headerAST, null, nsDef, null);
+			rewriter.rewriteAST().perform(new NullProgressMonitor()); 
+		} 
+		catch (NoSuchFileException | CoreException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+	
+ 	/**
+ 	 * Create the source for this library
+ 	 * @param classMembersMap
+ 	 */
+	private void createSource (HashMap<ICPPClassType, List<ICPPMember>> classMembersMap) {
+		try {
+			//
+			IFile file = CdtUtilities.createNewFile(cproject, myDIR, myLIBRARYcpp);
+			if (file == null)
+				throw new NoSuchFileException("Could not create source file " + myDIR + "/" + myLIBRARYcpp);
+
+			// Create translation unit for file
+			ITranslationUnit libTU = CoreModelUtil.findTranslationUnit(file);
+			// get ast
+			IASTTranslationUnit sourceAST = libTU.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
+			// get rewriter
+			ASTRewrite rewriter = ASTRewrite.create(sourceAST);
+			// get node factory
+			ICPPNodeFactory nodeFactory = (ICPPNodeFactory) sourceAST.getASTNodeFactory();
+
+			//1) add include directives
+			IASTName myLibInclude = nodeFactory.newName("#include \"" + myLIBRARYhpp +"\"");
+			rewriter.insertBefore(sourceAST, null, myLibInclude, null);
+			IASTName iostreamINclude = nodeFactory.newName("#include <iostream>");
+			rewriter.insertBefore(sourceAST, null, iostreamINclude, null);
+			
+			//2) add using directives
+//			ICPPASTUsingDirective usingDirective = nodeFactory.newUsingDirective(nodeFactory.newName("tinyxml2"));
+//			rewriter.insertBefore(libAST, null, usingDirective, null);
+
+			//3) add namespace definition
+			ICPPASTNamespaceDefinition nsDef = nodeFactory.newNamespaceDefinition(nodeFactory.newName(myNAMESPACE));
+			
+			//4) Refactor classes and methods
+			refactorFunctionImplementations(nodeFactory, classMembersMap, nsDef);
+			
+			//6) add namespace to ast
+			rewriter.insertBefore(sourceAST, null, nsDef, null);
 			rewriter.rewriteAST().perform(new NullProgressMonitor()); 
 		} 
 		catch (NoSuchFileException | CoreException e) {
@@ -417,6 +476,107 @@ public class RefactoringAST {
 			IASTSimpleDeclaration newDeclaration = nodeFactory.newSimpleDeclaration(newClass);
 			nsDef.addDeclaration(newDeclaration);
 		}
+	}
+	
+	
+	
+	/**
+	 * Refactor classes and methods
+	 * @param nsDef
+	 * @param nodeFactory
+	 * @throws CoreException
+	 * @throws DOMException 
+	 */
+	private void refactorFunctionImplementations (ICPPNodeFactory nodeFactory, HashMap<ICPPClassType, List<ICPPMember>> classMembersMap, 
+												 	ICPPASTNamespaceDefinition nsDef) throws CoreException{		
+		
+		for (ICPPClassType owningclass : classMembersMap.keySet()){
+
+			//create function definitions
+			List<ICPPMember> membersList = classMembersMap.get(owningclass);
+			for (ICPPMember member : membersList){
+			
+				if (member instanceof ICPPMethod){
+					//add definition
+					IIndexName[] methodDefs = projectIndex.findNames(member, IIndex.FIND_DEFINITIONS);
+					
+					if (methodDefs.length > 0){ // its size should be 1
+						IIndexName mDef    = methodDefs[0];
+						ICPPASTFunctionDefinition node = (ICPPASTFunctionDefinition)findNodeFromIndex(mDef, ICPPASTFunctionDefinition.class);
+						
+						//create new function definition
+						//we need to do it manually because of the chain initialisers, added later in this function
+//						ICPPASTFunctionDefinition newFunctionDef = node.copy(CopyStyle.withLocations);
+//						newFunctionDef.setBody(nodeFactory.newCompoundStatement());
+						ICPPASTFunctionDefinition newFunctionDef = nodeFactory.newFunctionDefinition(node.getDeclSpecifier().copy(CopyStyle.withLocations),
+								  																	 node.getDeclarator().copy(CopyStyle.withLocations),
+								  																	 nodeFactory.newCompoundStatement());
+																		
+						//manage function declarator qualified names so that are in the form Class::Function(...){}, in cpp file. 
+						//if the specifier of this function does not include class name (e.g., defined in header) modify this
+						ICPPASTFunctionDeclarator fDecl = (ICPPASTFunctionDeclarator) newFunctionDef.getDeclarator();
+						if (!(fDecl.getName() instanceof ICPPASTQualifiedName)){
+							ICPPASTQualifiedName qualName =  nodeFactory.newQualifiedName(new String[]{owningclass.getName()}, member.getName());
+							fDecl.setName(qualName);
+						}
+						
+						//manage initialiser lists: any constructor (superclass) initialisers should be added here 
+						for (ICPPASTConstructorChainInitializer initialiser: node.getMemberInitializers()){
+							IASTName initialiserName = initialiser.getMemberInitializerId();
+							IBinding initialiserBinding = initialiserName.resolveBinding(); 
+							
+							if ( (initialiserBinding instanceof ICPPConstructor) ){
+								IBinding bindingClass = initialiserBinding.getOwner();
+								if (classMembersMap.keySet().contains(bindingClass))
+									newFunctionDef.addMemberInitializer(initialiser.copy(CopyStyle.withLocations));
+								else 
+									throw new IllegalArgumentException("Class " + bindingClass + "not found!");	
+							}
+						}
+						
+						//manage return function specifiers
+						IASTDeclSpecifier declSpecifier 	= newFunctionDef.getDeclSpecifier();
+						IASTReturnStatement returnStatement	= nodeFactory.newReturnStatement(null);
+						//if the return type is simple specifier except void --> add a null return statement
+						if ( (declSpecifier instanceof IASTSimpleDeclSpecifier) && 
+							 (((IASTSimpleDeclSpecifier)declSpecifier).getType() > IASTSimpleDeclSpecifier.t_void) ){
+							returnStatement.setReturnValue(nodeFactory.newLiteralExpression(IASTLiteralExpression.lk_nullptr, "NULL"));
+						}
+						//if the return type is a qualified name (e.g., class, enumeration etc) --> 
+						//   if it is a class --> add a null return statement
+						//   if it is an enumerator --> select a random enum item
+						else if (declSpecifier instanceof ICPPASTNamedTypeSpecifier){
+							//FIXME: problem with resolving names for enumerations
+							IASTName declName 		= ((ICPPASTNamedTypeSpecifier) declSpecifier).getName();
+//							System.out.println(declName.getClass().getSimpleName() +"\t"+ declName.getParent().getClass().getSimpleName() +"\t"+ declName.getParent().getParent().getClass().getSimpleName());	
+							IBinding declBinding	= declName.resolveBinding();
+							System.out.println(declBinding.getClass());
+							if (declBinding instanceof ICPPEnumeration){
+								IIndexName[] enumDefs = projectIndex.findNames(declBinding, IIndex.FIND_DEFINITIONS);
+								if (enumDefs.length > 0){ // its size should be 1
+									IIndexName enumDef    = enumDefs[0];
+									IASTEnumerationSpecifier enumNode 	  = (IASTEnumerationSpecifier) findNodeFromIndex(enumDef, IASTEnumerationSpecifier.class);
+									if (enumNode.getEnumerators().length !=1)
+										returnStatement.setReturnValue(nodeFactory.newLiteralExpression(IASTLiteralExpression.lk_false, enumNode.getEnumerators()[0].getName().toString()));
+									else 
+										throw new IllegalArgumentException("Enumerator " + declBinding + "not found!");	
+								}
+							}
+							else
+								returnStatement.setReturnValue(nodeFactory.newLiteralExpression(IASTLiteralExpression.lk_nullptr, "NULL"));
+								
+						}
+						IASTCompoundStatement compoundStatement = (IASTCompoundStatement) newFunctionDef.getBody();
+						compoundStatement.addStatement(returnStatement);
+
+
+						//add the new definition to the namespace
+						nsDef.addDeclaration(newFunctionDef);
+					}
+					
+				}
+			}
+		}				
 	}
 	
 	
