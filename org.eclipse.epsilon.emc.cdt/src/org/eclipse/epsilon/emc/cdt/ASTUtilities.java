@@ -103,7 +103,6 @@ public class ASTUtilities {
 	
 	/**
 	 * Find the bindings for the given function
-	 * TODO: Return these bindings
 	 * @param functionName
 	 * @param projectIndex
 	 */

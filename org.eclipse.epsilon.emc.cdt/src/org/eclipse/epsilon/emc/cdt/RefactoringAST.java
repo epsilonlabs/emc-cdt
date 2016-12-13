@@ -6,15 +6,15 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.eclipse.cdt.core.CCorePlugin;
 import org.eclipse.cdt.core.dom.ast.ASTVisitor;
 import org.eclipse.cdt.core.dom.ast.DOMException;
 import org.eclipse.cdt.core.dom.ast.IASTCompositeTypeSpecifier;
+import org.eclipse.cdt.core.dom.ast.IASTDeclSpecifier;
 import org.eclipse.cdt.core.dom.ast.IASTDeclaration;
-import org.eclipse.cdt.core.dom.ast.IASTElaboratedTypeSpecifier;
-import org.eclipse.cdt.core.dom.ast.IASTEnumerationSpecifier;
 import org.eclipse.cdt.core.dom.ast.IASTExpression;
 import org.eclipse.cdt.core.dom.ast.IASTFieldReference;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionCallExpression;
@@ -41,6 +41,7 @@ import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNamespaceDefinition;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTVisibilityLabel;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPClassType;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPConstructor;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPMember;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPMethod;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPNamespaceScope;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPNodeFactory;
@@ -121,20 +122,21 @@ public class RefactoringAST {
 				
 				// if the list is not empty, then it uses the legacy library --> add it to cached library
 				if (fcVisitor.libraryCallsExist()) {
-					libraryCache.put(tu, fcVisitor.getNamesList());
-					namesSet.addAll(fcVisitor.getNamesSet());
-					bindingsSet.addAll(fcVisitor.getBindingsSet());
+					libraryCache.put(tu, fcVisitor.namesList);
+					namesSet.addAll(fcVisitor.namesSet);
+					bindingsSet.addAll(fcVisitor.bindingsSet);
 					nodesList.addAll(fcVisitor.nodesList);
 				}
 			}
 			
-			assert(namesSet.size() == bindingsSet.size());
-			assert(namesSet.size() == nodesList.size());
+			//FIXME: -ea VM flag does not work - how to enable assertions?
+//			assert(namesSet.size() == bindingsSet.size());
+//			assert(namesSet.size() == nodesList.size());
 			
-			System.out.println(namesSet.size() +"\t"+ bindingsSet.size() +"\t"+ nodesList.size());
-			for (int i=0; i<namesSet.size(); i++){
-				System.out.println(namesSet.getList().get(i) +"\t"+ bindingsSet.getList().get(i).getClass().getSimpleName());// +"\t"+ nodesList.get(i));
-			}
+//			System.out.println(namesSet.size() +"\t"+ bindingsSet.size() +"\t"+ nodesList.size());
+//			for (int i=0; i<namesSet.size(); i++){
+//				System.out.println(namesSet.getList().get(i) +"\t"+ bindingsSet.getList().get(i).getClass().getSimpleName());// +"\t"+ nodesList.get(i));
+//			}
 
 			//check for library uses within the same library
 			checkReferences();
@@ -143,9 +145,6 @@ public class RefactoringAST {
 			for (int i=0; i<namesSet.size(); i++){
 				System.out.println(namesSet.getList().get(i) +"\t"+ bindingsSet.getList().get(i).getClass().getSimpleName());// +"\t"+ nodesList.get(i));
 			}
-
-			assert(namesSet.size() == bindingsSet.size());
-			assert(namesSet.size() == nodesList.size());
 
 			//create refactored code
 			createRefactoredCode(namesSet, bindingsSet, nodesList);
@@ -161,10 +160,11 @@ public class RefactoringAST {
  			BindingsSet bindings = new BindingsSet();
  			bindings.addAll(bindingsSet);
 
+			projectIndex.acquireReadLock();
 	 		for (IBinding binding : bindings){
- 				projectIndex.acquireReadLock();
 	 			if (binding instanceof ICPPClassType){						
 	 				ICPPClassType aClass = (ICPPClassType)binding;
+	 				
 	 				checkClassInheritance(aClass);
 	 			}
 	 			else if (binding instanceof IEnumeration){
