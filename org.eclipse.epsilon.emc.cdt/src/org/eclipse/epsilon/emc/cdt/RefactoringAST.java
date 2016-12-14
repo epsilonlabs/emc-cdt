@@ -1,3 +1,13 @@
+/*******************************************************************************
+ * Copyright (c) 2016 University of York.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ * 
+ * Contributors:
+ *     Simos Gerasimou - initial API and implementation
+ ******************************************************************************/
 package org.eclipse.epsilon.emc.cdt;
 
 import java.nio.file.NoSuchFileException;
@@ -5,11 +15,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.eclipse.cdt.core.CCorePlugin;
+import org.eclipse.cdt.core.dom.IName;
 import org.eclipse.cdt.core.dom.ast.ASTVisitor;
 import org.eclipse.cdt.core.dom.ast.DOMException;
 import org.eclipse.cdt.core.dom.ast.IASTCompoundStatement;
@@ -42,11 +55,14 @@ import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTConstructorChainInitializer;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTElaboratedTypeSpecifier;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTFunctionDeclarator;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTFunctionDefinition;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTName;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNameSpecifier;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNamedTypeSpecifier;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNamespaceDefinition;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTParameterDeclaration;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTQualifiedName;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTVisibilityLabel;
+import org.eclipse.cdt.core.dom.ast.cpp.ICPPBase;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPClassType;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPConstructor;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPEnumeration;
@@ -66,6 +82,7 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.epsilon.common.util.ListSet;
+import org.eclipse.epsilon.emc.cdt.utilities.Digraph;
 import org.eclipse.ltk.core.refactoring.Change;
 
 public class RefactoringAST {
@@ -77,7 +94,10 @@ public class RefactoringAST {
 	protected IIndex projectIndex = null;
 	
 	/** Pairs of ITranslationUnit, IASTTranslationUnit **/
-	HashMap<ITranslationUnit, IASTTranslationUnit> astCache = new HashMap<>();
+	HashMap<ITranslationUnit, IASTTranslationUnit> astCache = new HashMap<ITranslationUnit, IASTTranslationUnit>();
+
+	/** Pairs of elements-potential name from standard C++ library that should be included using #include directives*/
+	LinkedHashMap<IASTName, String> includeDirectivesMap = new LinkedHashMap<IASTName, String>();
 
 
 	private static String elements[] = { "tinyxml2" };
@@ -92,6 +112,7 @@ public class RefactoringAST {
 	/** Keep refactoring information*/
 	NamesSet 	namesSet 	 = new NamesSet();
 	BindingsSet bindingsSet  = new BindingsSet();
+	//FIXME: not correct, do not use this list
 	List<IASTNode> nodesList = new ArrayList<IASTNode>();
 
 	
@@ -106,7 +127,6 @@ public class RefactoringAST {
 		}
 	}
 
-	
 	
  	protected void refactor(final String[] excludedFiles) {
 		try {
@@ -144,11 +164,6 @@ public class RefactoringAST {
 //			assert(namesSet.size() == bindingsSet.size());
 //			assert(namesSet.size() == nodesList.size());
 			
-//			System.out.println(namesSet.size() +"\t"+ bindingsSet.size() +"\t"+ nodesList.size());
-//			for (int i=0; i<namesSet.size(); i++){
-//				System.out.println(namesSet.getList().get(i) +"\t"+ bindingsSet.getList().get(i).getClass().getSimpleName());// +"\t"+ nodesList.get(i));
-//			}
-
 			//check for library uses within the same library
 			checkReferences();
 
@@ -158,7 +173,7 @@ public class RefactoringAST {
 			}
 
 			//find mappings class - members
-			HashMap<ICPPClassType, List<ICPPMember>> classMembersMap = null; 
+			Map<ICPPClassType, List<ICPPMember>> classMembersMap = null; 
 			classMembersMap = createClassMembersMapping();
 
 			//create header file
@@ -180,29 +195,119 @@ public class RefactoringAST {
 
 			projectIndex.acquireReadLock();
 	 		for (IBinding binding : bindings){
-	 			if (binding instanceof ICPPClassType){						
-	 				ICPPClassType aClass = (ICPPClassType)binding;
-	 				
-	 				checkClassInheritance(aClass);
+	 			if (binding instanceof ICPPClassType){
+	 				System.out.println(binding + "\t ICPPClassType");
+	 				ICPPClassType classBinding = (ICPPClassType)binding;	 				
+	 				checkClassInheritance(classBinding);
+	 			
+	 				for (ICPPConstructor constructor : classBinding.getConstructors()){
+//	 					IIndexName[] methodDecls = projectIndex.findNames(constructor, IIndex.FIND_DECLARATIONS);
+//	 					if (methodDecls.length > 0){						
+//	 						ICPPASTFunctionDeclarator methodDecl = (ICPPASTFunctionDeclarator) findNodeFromIndex(methodDecls[0], ICPPASTFunctionDeclarator.class);
+//	 						namesSet.add(methodDecl.getName());
+//	 						bindingsSet.add(constructor);
+//	 					}
+	 					checkMethodSignature(constructor);
+	 				}
 	 			}
 	 			else if (binding instanceof IEnumeration){
 	 				System.out.println(binding + "\t IEnumeration");
 	 			}
 	 			else if (binding instanceof ICPPMethod){
-	 				System.out.println(binding + "Method");
+	 				System.out.println(binding + "IMethod");
+	 				checkMethodSignature((ICPPMethod)binding);
 	 			}
 	 		}	
  		} 
- 		catch (InterruptedException | CoreException e) {		
+ 		catch (InterruptedException | CoreException | DOMException  e) {		
  			e.printStackTrace();		
  		}
  		finally{
  			projectIndex.releaseReadLock();
  		}
  	}
+
+ 	
+ 	/**
+ 	 * Check inheritance for a given class
+ 	 * @param binding
+ 	 * @throws CoreException
+ 	 */
+ 	private void checkClassInheritance (ICPPClassType classBinding) throws CoreException{
+		for (ICPPBase baseClazz : classBinding.getBases()){
+			IBinding baseBinding = baseClazz.getBaseClass();
+			
+			if (baseBinding instanceof ICPPClassType){
+				//if the base binding (base class) is not in the bindings set, 
+				if (!bindingsSet.contains(baseBinding)){
+					IIndexName[] cDefs = projectIndex.findNames(baseBinding, IIndex.FIND_DEFINITIONS);
+					if (cDefs.length > 0){						
+						bindingsSet.add(baseBinding);
+						ICPPASTName nameNode = (ICPPASTName) findNodeFromIndex(cDefs[0], ICPPASTName.class);
+						namesSet.add(nameNode);
+					}
+					//recursively check the base binding (parent class)
+					checkClassInheritance((ICPPClassType)baseBinding);
+				}
+			}	
+		}
+ 	}
+ 	
+ 
+ 	
+ 	private void checkMethodSignature(ICPPMethod methodBinding) throws CoreException, DOMException{
+		IIndexName[] methodDecls = projectIndex.findNames(methodBinding, IIndex.FIND_DECLARATIONS);
+		if (methodDecls.length > 0){						
+			ICPPASTFunctionDeclarator methodDecl = (ICPPASTFunctionDeclarator) findNodeFromIndex(methodDecls[0], ICPPASTFunctionDeclarator.class);
+			ICPPASTParameterDeclaration paramDecls[] = methodDecl.getParameters();
+			
+			for (ICPPASTParameterDeclaration paramDecl :paramDecls ){
+				IASTDeclSpecifier paramDeclSpecifier = paramDecl.getDeclSpecifier();
+				
+				//if it's not not a simple specifier (void, int, double, etc.) 
+				//1) if it's part of the legacy library, include it in the set of elements to be migrated
+				//2) if it's part of a standard c++ library, add it to the set of include directives
+				if (paramDeclSpecifier instanceof ICPPASTNamedTypeSpecifier){
+					IASTName paramSpecifierName 	= ((ICPPASTNamedTypeSpecifier) paramDeclSpecifier).getName();
+					IBinding paramSpecifierBinding	= paramSpecifierName.resolveBinding();
+					//find where the param specifier is defined
+					IIndexName[] paramSpecifierDefs = projectIndex.findNames(paramSpecifierBinding, IIndex.FIND_DEFINITIONS); 
+					if (paramSpecifierDefs.length>0){
+						IIndexName paramSpecifierDef = paramSpecifierDefs[0];
+						IASTSimpleDeclaration node 	= (IASTSimpleDeclaration)findNodeFromIndex(paramSpecifierDef, IASTSimpleDeclaration.class);
+						
+						// while not reached a namespace scope
+						ICPPNamespaceScope scope = (ICPPNamespaceScope) paramSpecifierBinding.getScope();
+
+						while (!((scope != null) && (scope instanceof ICPPNamespaceScope))) {
+							scope = (ICPPNamespaceScope) scope.getParent();
+						}
+
+						IName scopeName = scope.getScopeName();
+						if ( (scopeName != null) &&
+						     (REFACTORING_NAMESPACES.contains(scopeName.toString())) ){
+								bindingsSet.add(paramSpecifierBinding);
+								namesSet.add(paramSpecifierName);	
+						}
+						else{//it is an include directive from the c++ libs				
+							System.out.println(node +"\t"+ node.getContainingFilename() +"\t"+ node.getTranslationUnit().getFilePath());
+							includeDirectivesMap.put(paramSpecifierName, node.getContainingFilename());
+						}
+					}
+				}
+			}
+		}
+
+ 	}
  	
  	
- 	private void checkClassInheritance (ICPPClassType binding) throws CoreException{
+ 	/**
+ 	 * Check inheritance for a given class
+ 	 * @param binding
+ 	 * @throws CoreException
+ 	 */
+ 	@Deprecated
+  	private void checkClassInheritanceDep (ICPPClassType binding) throws CoreException{
 		IIndexName definitions[] = projectIndex.findDefinitions(binding);
 		for (IIndexName def : definitions) {
 
@@ -216,9 +321,10 @@ public class RefactoringAST {
 					 shouldVisitDecltypeSpecifiers = true;}
 					@Override
 					public int visit(ICPPASTBaseSpecifier baseSpecifier) {
-						System.out.println("Bingo");
+//						System.out.println("Bingo");
 						ICPPASTNameSpecifier n = baseSpecifier.getNameSpecifier();
-						IBinding b = n.resolveBinding(); 
+						IBinding b = n.resolveBinding();
+						b = n.resolvePreBinding();
 						if (b instanceof ICPPClassType && !bindingsSet.contains(b))
 							try {
 								if (n instanceof IASTName){
@@ -247,7 +353,7 @@ public class RefactoringAST {
  	 * Create the header for this library
  	 * @param classMembersMap
  	 */
-	private void createHeader (HashMap<ICPPClassType, List<ICPPMember>> classMembersMap) {
+	private void createHeader (Map<ICPPClassType, List<ICPPMember>> classMembersMap) {
 		try {
 			//
 			IFile file = CdtUtilities.createNewFile(cproject, myDIR, myLIBRARYhpp);
@@ -264,8 +370,11 @@ public class RefactoringAST {
 			ICPPNodeFactory nodeFactory = (ICPPNodeFactory) headerAST.getASTNodeFactory();
 
 			//1) add include directives
-//			IASTName includeDir = nodeFactory.newName("#include \"tinyXML2.h\"");
-//			rewriter.insertBefore(libAST, null, includeDir, null);
+			for (IASTName name : includeDirectivesMap.keySet()){
+				String includeDirective = includeDirectivesMap.get(name);
+				IASTName includeDir = nodeFactory.newName("#include <" + includeDirective +">");
+				rewriter.insertBefore(headerAST, null, includeDir, null);
+			}
 			
 			//2) add using directives
 //			ICPPASTUsingDirective usingDirective = nodeFactory.newUsingDirective(nodeFactory.newName("tinyxml2"));
@@ -275,7 +384,7 @@ public class RefactoringAST {
 			ICPPASTNamespaceDefinition nsDef = nodeFactory.newNamespaceDefinition(nodeFactory.newName(myNAMESPACE));
 			
 			//4) create forward declarations
-			refactorForwardDeclarations(nsDef, nodeFactory);
+			refactorForwardDeclarations(nsDef, nodeFactory, classMembersMap.keySet());
 			
 			//5) Refactor enumerations
 			refactorEnumerations(nsDef);
@@ -293,12 +402,11 @@ public class RefactoringAST {
 	}
 	
 	
-	
  	/**
  	 * Create the source for this library
  	 * @param classMembersMap
  	 */
-	private void createSource (HashMap<ICPPClassType, List<ICPPMember>> classMembersMap) {
+	private void createSource (Map<ICPPClassType, List<ICPPMember>> classMembersMap) {
 		try {
 			//
 			IFile file = CdtUtilities.createNewFile(cproject, myDIR, myLIBRARYcpp);
@@ -345,8 +453,8 @@ public class RefactoringAST {
 	 * @param nsDef
 	 * @throws CoreException
 	 */
-	private void refactorForwardDeclarations (ICPPASTNamespaceDefinition nsDef, ICPPNodeFactory nodeFactory) throws CoreException{		
-		for (IBinding binding : bindingsSet){
+	private void refactorForwardDeclarations (ICPPASTNamespaceDefinition nsDef, ICPPNodeFactory nodeFactory, Set<ICPPClassType> classBindings) throws CoreException{		
+		for (ICPPClassType binding : classBindings){
 			//add forward declaration for classes
 			if (binding instanceof ICPPClassType){
 				IASTName name 							 = nodeFactory.newName(binding.getName());
@@ -364,15 +472,11 @@ public class RefactoringAST {
 	 * @throws CoreException
 	 */
 	private void refactorEnumerations (ICPPASTNamespaceDefinition nsDef) throws CoreException{
-		List<Integer> elementsToRemove = new ArrayList<Integer>();
-		
-		for (int index=0; index<namesSet.size(); index++){
+		for (int index=0; index<bindingsSet.size(); index++){
 			IBinding binding = bindingsSet.getList().get(index);
 			
 			//do something with the enumeration
 			if (binding instanceof IEnumeration){
-				//add index to the list to be removed
-				elementsToRemove.add(index);
 				
 				//get enumeration binding
 				IEnumeration enumeration = (IEnumeration)binding;
@@ -392,14 +496,6 @@ public class RefactoringAST {
 				}
 			}
 		}
-		
-		//remove enumerations from lists
-		//FIXME problem with nodesList (not used but should be fixed)
-		for (int index : elementsToRemove){
-			namesSet.getList().remove(index);
-			bindingsSet.getList().remove(index);
-			nodesList.remove(index);
-		}
 	}
 	
 	
@@ -410,7 +506,7 @@ public class RefactoringAST {
 	 * @throws CoreException
 	 * @throws DOMException 
 	 */
-	private void refactorClasses (ICPPNodeFactory nodeFactory, HashMap<ICPPClassType, List<ICPPMember>> classMembersMap, ICPPASTNamespaceDefinition nsDef) throws CoreException{		
+	private void refactorClasses (ICPPNodeFactory nodeFactory, Map<ICPPClassType, List<ICPPMember>> classMembersMap, ICPPASTNamespaceDefinition nsDef) throws CoreException{		
 		for (ICPPClassType owningclass : classMembersMap.keySet()){			
 			
 			//create the class
@@ -479,7 +575,6 @@ public class RefactoringAST {
 	}
 	
 	
-	
 	/**
 	 * Refactor classes and methods
 	 * @param nsDef
@@ -487,7 +582,7 @@ public class RefactoringAST {
 	 * @throws CoreException
 	 * @throws DOMException 
 	 */
-	private void refactorFunctionImplementations (ICPPNodeFactory nodeFactory, HashMap<ICPPClassType, List<ICPPMember>> classMembersMap, 
+	private void refactorFunctionImplementations (ICPPNodeFactory nodeFactory, Map<ICPPClassType, List<ICPPMember>> classMembersMap, 
 												 	ICPPASTNamespaceDefinition nsDef) throws CoreException{		
 		
 		for (ICPPClassType owningclass : classMembersMap.keySet()){
@@ -535,7 +630,7 @@ public class RefactoringAST {
 						}
 						
 						//manage return function specifiers
-						IASTDeclSpecifier declSpecifier 	= newFunctionDef.getDeclSpecifier();
+						IASTDeclSpecifier declSpecifier 	= node.getDeclSpecifier();
 						IASTReturnStatement returnStatement	= nodeFactory.newReturnStatement(null);
 						//if the return type is simple specifier except void --> add a null return statement
 						if ( (declSpecifier instanceof IASTSimpleDeclSpecifier) && 
@@ -546,11 +641,9 @@ public class RefactoringAST {
 						//   if it is a class --> add a null return statement
 						//   if it is an enumerator --> select a random enum item
 						else if (declSpecifier instanceof ICPPASTNamedTypeSpecifier){
-							//FIXME: problem with resolving names for enumerations
 							IASTName declName 		= ((ICPPASTNamedTypeSpecifier) declSpecifier).getName();
-//							System.out.println(declName.getClass().getSimpleName() +"\t"+ declName.getParent().getClass().getSimpleName() +"\t"+ declName.getParent().getParent().getClass().getSimpleName());	
 							IBinding declBinding	= declName.resolveBinding();
-							System.out.println(declBinding.getClass());
+
 							if (declBinding instanceof ICPPEnumeration){
 								IIndexName[] enumDefs = projectIndex.findNames(declBinding, IIndex.FIND_DEFINITIONS);
 								if (enumDefs.length > 0){ // its size should be 1
@@ -584,7 +677,7 @@ public class RefactoringAST {
 	 * Given the binding set, generate a hash map that comprises the 
 	 * @return
 	 */
-	private HashMap<ICPPClassType, List<ICPPMember>> createClassMembersMapping(){
+	private LinkedHashMap<ICPPClassType, List<ICPPMember>> createClassMembersMapping(){
 		HashMap<ICPPClassType, List<ICPPMember>> classMembersMap = new HashMap<ICPPClassType, List<ICPPMember>>(); 
 		
 		for (IBinding binding : bindingsSet){			
@@ -605,7 +698,7 @@ public class RefactoringAST {
 					classMembersMap.get(owningClass).add(classMember);
 				}
 			}
-			//if it is a class and does exist in the hashmap, create add the mapping with an empty array list
+			//if it is a class and does exist in the hashmap, create a mapping with an empty array list
 			else if (binding instanceof ICPPClassType){
 				ICPPClassType owningClass = (ICPPClassType)binding;
 				if (!classMembersMap.containsKey(owningClass)){
@@ -617,7 +710,37 @@ public class RefactoringAST {
 					throw new IllegalArgumentException("Class " + owningClass.getName() + "already exists in hashmap");
 			}
 		}
-		return classMembersMap;
+		
+		//once the mapping is done, do a dependency/inheritance topological sorting of the classes
+		//do determine their insertion order in the header file
+		//TODO: optimise this; it can be embedded into the previous for loop, or in checkClassInheritance()
+		Digraph<ICPPClassType> bindingsGraph = new Digraph<ICPPClassType>();
+		for (ICPPClassType classBinding : classMembersMap.keySet()){		
+			//find base classes and add them to the DAG
+			for (ICPPBase baseClazz : classBinding.getBases()){
+				IBinding baseBinding = baseClazz.getBaseClass();
+					
+				//if the base binding (base class) is not in the bindings set
+				//then checkClassInheritance() failed
+				if (!bindingsSet.contains(baseBinding))
+					throw new NoSuchElementException("Base class " + baseBinding + "not exists in bindings set!");
+					
+				if (baseBinding instanceof ICPPClassType)
+					bindingsGraph.add((ICPPClassType)baseBinding, classBinding);
+			}
+		}
+//        System.out.println("In-degrees: " + bindingsGraph.inDegree());
+//        System.out.println("Out-degrees: " + bindingsGraph.outDegree());
+        System.out.println("\nA topological sort of the vertices: " + bindingsGraph.topSort());
+        System.out.println("The graph " + (bindingsGraph.isDag()?"is":"is not") + " a dag\n");
+		
+		List<ICPPClassType> topSortedBindings = bindingsGraph.topSort();
+		LinkedHashMap<ICPPClassType, List<ICPPMember>> sortedClassMembersMap = new LinkedHashMap<ICPPClassType, List<ICPPMember>>(); 
+		for (ICPPClassType binding : topSortedBindings){
+			sortedClassMembersMap.put(binding, classMembersMap.get(binding));
+		}
+		
+		return sortedClassMembersMap;
 
 	}
 	
