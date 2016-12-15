@@ -1,14 +1,9 @@
 package org.eclipse.epsilon.emc.cdt.propertygetter;
 
+import java.util.HashMap;
+
 import org.eclipse.cdt.core.CCorePlugin;
-import org.eclipse.cdt.core.dom.ast.DOMException;
-import org.eclipse.cdt.core.dom.ast.IASTFunctionCallExpression;
-import org.eclipse.cdt.core.dom.ast.IASTIdExpression;
 import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
-import org.eclipse.cdt.core.dom.ast.IBinding;
-import org.eclipse.cdt.core.dom.ast.IScope;
-import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTFunctionCallExpression;
-import org.eclipse.cdt.core.dom.ast.cpp.ICPPNamespaceScope;
 import org.eclipse.cdt.core.index.IIndex;
 import org.eclipse.cdt.core.model.ICElement;
 import org.eclipse.cdt.core.model.ITranslationUnit;
@@ -17,9 +12,11 @@ import org.eclipse.epsilon.emc.cdt.NameFinderASTVisitor;
 
 public class TranslationUnitGetter extends CElementGetter<Object> {
 	private final static String ACCEPT_NAME		= "name";
-		
-
+	
 	private final static String ACCEPT_LIB		= "lib";
+
+	/** Pairs of ITranslationUnit, IASTTranslationUnit **/
+	private HashMap<ITranslationUnit, IASTTranslationUnit> astCache = new HashMap<ITranslationUnit, IASTTranslationUnit>();
 
 	/**
 	 * Class constructor
@@ -43,10 +40,20 @@ public class TranslationUnitGetter extends CElementGetter<Object> {
 				try {
 					//get tu
 					ITranslationUnit tu = (ITranslationUnit)object;
+					
 					//create index
-					IIndex index = CCorePlugin.getIndexManager().getIndex(tu.getCProject() );
-					// get AST
-					IASTTranslationUnit ast = tu.getAST(index, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
+					IIndex projectIndex = CCorePlugin.getIndexManager().getIndex(tu.getCProject() );
+					
+					//cache ast
+					IASTTranslationUnit ast = null;
+					if (astCache.containsKey(tu)){
+						ast = astCache.get(tu);
+					}
+					else{
+						ast = tu.getAST(projectIndex, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
+						astCache.put(tu, ast);
+					}
+					
 					//visitor
 					NameFinderASTVisitor visitor = new NameFinderASTVisitor();
 					ast.accept(visitor);
