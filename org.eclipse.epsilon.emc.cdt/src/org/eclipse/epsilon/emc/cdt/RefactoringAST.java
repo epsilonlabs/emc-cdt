@@ -266,45 +266,96 @@ public class RefactoringAST {
 		IIndexName[] methodDecls = projectIndex.findNames(methodBinding, IIndex.FIND_DECLARATIONS);
 		if (methodDecls.length > 0){						
 			ICPPASTFunctionDeclarator methodDecl = (ICPPASTFunctionDeclarator) findNodeFromIndex(methodDecls[0], ICPPASTFunctionDeclarator.class);
-			ICPPASTParameterDeclaration paramDecls[] = methodDecl.getParameters();
 			
+			//check return type
+			IASTNode parent = methodDecl.getParent(); 
+			IASTDeclSpecifier returnDeclSpecifier = null;
+			if (parent instanceof ICPPASTFunctionDefinition)
+				returnDeclSpecifier = ((ICPPASTFunctionDefinition)parent).getDeclSpecifier();
+			else if (parent instanceof IASTSimpleDeclaration)
+				returnDeclSpecifier = ((IASTSimpleDeclaration)parent).getDeclSpecifier();
+			
+			if (returnDeclSpecifier instanceof ICPPASTNamedTypeSpecifier){
+				checkDeclSpecifier(returnDeclSpecifier);
+			}
+			
+			
+			//check parameters
+			ICPPASTParameterDeclaration paramDecls[] = methodDecl.getParameters();
 			for (ICPPASTParameterDeclaration paramDecl :paramDecls ){
 				IASTDeclSpecifier paramDeclSpecifier = paramDecl.getDeclSpecifier();
 				
-				//if it's not not a simple specifier (void, int, double, etc.) 
-				//1) if it's part of the legacy library, include it in the set of elements to be migrated
-				//2) if it's part of a standard c++ library, add it to the set of include directives
-				if (paramDeclSpecifier instanceof ICPPASTNamedTypeSpecifier){
-					IASTName paramSpecifierName 	= ((ICPPASTNamedTypeSpecifier) paramDeclSpecifier).getName();
-					IBinding paramSpecifierBinding	= paramSpecifierName.resolveBinding();
-					//find where the param specifier is defined
-					IIndexName[] paramSpecifierDefs = projectIndex.findNames(paramSpecifierBinding, IIndex.FIND_DEFINITIONS); 
-					if (paramSpecifierDefs.length>0){
-						IIndexName paramSpecifierDef = paramSpecifierDefs[0];
-						IASTSimpleDeclaration node 	= (IASTSimpleDeclaration)findNodeFromIndex(paramSpecifierDef, IASTSimpleDeclaration.class);
-						
-						// while not reached a namespace scope
-						ICPPNamespaceScope scope = (ICPPNamespaceScope) paramSpecifierBinding.getScope();
-
-						while (!((scope != null) && (scope instanceof ICPPNamespaceScope))) {
-							scope = (ICPPNamespaceScope) scope.getParent();
-						}
-
-						IName scopeName = scope.getScopeName();
-						if ( (scopeName != null) &&
-						     (REFACTORING_NAMESPACES.contains(scopeName.toString())) ){
-								bindingsSet.add(paramSpecifierBinding);
-								namesSet.add(paramSpecifierName);	
-						}
-						else{//it is an include directive from the c++ libs				
-							System.out.println(node +"\t"+ node.getContainingFilename() +"\t"+ node.getTranslationUnit().getFilePath());
-							includeDirectivesMap.put(paramSpecifierName, node.getContainingFilename());
-						}
-					}
-				}
+				checkDeclSpecifier(paramDeclSpecifier);
+				
+//				//if it's not not a simple specifier (void, int, double, etc.) 
+//				//1) if it's part of the legacy library, include it in the set of elements to be migrated
+//				//2) if it's part of a standard c++ library, add it to the set of include directives
+//				if (paramDeclSpecifier instanceof ICPPASTNamedTypeSpecifier){
+//					IASTName paramSpecifierName 	= ((ICPPASTNamedTypeSpecifier) paramDeclSpecifier).getName();
+//					IBinding paramSpecifierBinding	= paramSpecifierName.resolveBinding();
+//					//find where the param specifier is defined
+//					IIndexName[] paramSpecifierDefs = projectIndex.findNames(paramSpecifierBinding, IIndex.FIND_DEFINITIONS); 
+//					if (paramSpecifierDefs.length>0){
+//						IIndexName paramSpecifierDef = paramSpecifierDefs[0];
+//						IASTSimpleDeclaration node 	= (IASTSimpleDeclaration)findNodeFromIndex(paramSpecifierDef, IASTSimpleDeclaration.class);
+//						
+//						// while not reached a namespace scope
+//						ICPPNamespaceScope scope = (ICPPNamespaceScope) paramSpecifierBinding.getScope();
+//
+//						while (!((scope != null) && (scope instanceof ICPPNamespaceScope))) {
+//							scope = (ICPPNamespaceScope) scope.getParent();
+//						}
+//
+//						IName scopeName = scope.getScopeName();
+//						if ( (scopeName != null) &&
+//						     (REFACTORING_NAMESPACES.contains(scopeName.toString())) ){
+//								bindingsSet.add(paramSpecifierBinding);
+//								namesSet.add(paramSpecifierName);	
+//						}
+//						else{//it is an include directive from the c++ libs				
+//							System.out.println(node +"\t"+ node.getContainingFilename() +"\t"+ node.getTranslationUnit().getFilePath());
+//							includeDirectivesMap.put(paramSpecifierName, node.getContainingFilename());
+//						}
+//					}
+//				}
 			}
 		}
 
+ 	}
+ 	
+ 	
+ 	private void checkDeclSpecifier(IASTDeclSpecifier declSpecifier) throws CoreException, DOMException{
+		//if it's not not a simple specifier (void, int, double, etc.) 
+		//1) if it's part of the legacy library, include it in the set of elements to be migrated
+		//2) if it's part of a standard c++ library, add it to the set of include directives
+		if (declSpecifier instanceof ICPPASTNamedTypeSpecifier){
+			IASTName declSpecifierName 	= ((ICPPASTNamedTypeSpecifier) declSpecifier).getName();
+			IBinding declSpecifierBinding	= declSpecifierName.resolveBinding();
+			//find where the param specifier is defined
+			IIndexName[] paramSpecifierDefs = projectIndex.findNames(declSpecifierBinding, IIndex.FIND_DEFINITIONS); 
+			if (paramSpecifierDefs.length>0){
+				IIndexName paramSpecifierDef = paramSpecifierDefs[0];
+				IASTSimpleDeclaration node 	= (IASTSimpleDeclaration)findNodeFromIndex(paramSpecifierDef, IASTSimpleDeclaration.class);
+				
+				// while not reached a namespace scope
+				ICPPNamespaceScope scope = (ICPPNamespaceScope) declSpecifierBinding.getScope();
+
+				while (!((scope != null) && (scope instanceof ICPPNamespaceScope))) {
+					scope = (ICPPNamespaceScope) scope.getParent();
+				}
+
+				IName scopeName = scope.getScopeName();
+				if ( (scopeName != null) &&
+				     (REFACTORING_NAMESPACES.contains(scopeName.toString())) ){
+						bindingsSet.add(declSpecifierBinding);
+						namesSet.add(declSpecifierName);	
+				}
+				else{//it is an include directive from the c++ libs				
+					System.out.println(node +"\t"+ node.getContainingFilename() +"\t"+ node.getTranslationUnit().getFilePath());
+					includeDirectivesMap.put(declSpecifierName, node.getContainingFilename());
+				}
+			}
+		}
  	}
  	
  	
@@ -713,8 +764,8 @@ public class RefactoringAST {
 					membersList.addAll(Arrays.asList(owningClass.getConstructors()));//add class constructors
 					classMembersMap.put(owningClass, membersList);
 				}
-				else //duplicates should not exists at this point
-					throw new IllegalArgumentException("Class " + owningClass.getName() + "already exists in hashmap");
+//				else //duplicates should not exists at this point
+//					throw new IllegalArgumentException("Class " + owningClass.getName() + " already exists in hashmap");
 			}
 		}
 		
@@ -723,6 +774,8 @@ public class RefactoringAST {
 		//TODO: optimise this; it can be embedded into the previous for loop, or in checkClassInheritance()
 		Digraph<ICPPClassType> bindingsGraph = new Digraph<ICPPClassType>();
 		for (ICPPClassType classBinding : classMembersMap.keySet()){		
+			bindingsGraph.add(classBinding);
+
 			//find base classes and add them to the DAG
 			for (ICPPBase baseClazz : classBinding.getBases()){
 				IBinding baseBinding = baseClazz.getBaseClass();
