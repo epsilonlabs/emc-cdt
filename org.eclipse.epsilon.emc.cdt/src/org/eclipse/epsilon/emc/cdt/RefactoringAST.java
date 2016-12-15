@@ -204,16 +204,13 @@ public class RefactoringAST {
 	 		for (IBinding binding : bindings){
 	 			if (binding instanceof ICPPClassType){
 	 				System.out.println(binding + "\t ICPPClassType");
-	 				ICPPClassType classBinding = (ICPPClassType)binding;	 				
+	 				ICPPClassType classBinding = (ICPPClassType)binding;	 	
+	 				
+	 				//check inheritance of this class
 	 				checkClassInheritance(classBinding);
-	 			
+	 				
+	 				//check constructors' signatures
 	 				for (ICPPConstructor constructor : classBinding.getConstructors()){
-//	 					IIndexName[] methodDecls = projectIndex.findNames(constructor, IIndex.FIND_DECLARATIONS);
-//	 					if (methodDecls.length > 0){						
-//	 						ICPPASTFunctionDeclarator methodDecl = (ICPPASTFunctionDeclarator) findNodeFromIndex(methodDecls[0], ICPPASTFunctionDeclarator.class);
-//	 						namesSet.add(methodDecl.getName());
-//	 						bindingsSet.add(constructor);
-//	 					}
 	 					checkMethodSignature(constructor);
 	 				}
 	 			}
@@ -222,6 +219,7 @@ public class RefactoringAST {
 	 			}
 	 			else if (binding instanceof ICPPMethod){
 	 				System.out.println(binding + "IMethod");
+	 				//check the signature of this method 
 	 				checkMethodSignature((ICPPMethod)binding);
 	 			}
 	 		}	
@@ -260,7 +258,6 @@ public class RefactoringAST {
 		}
  	}
  	
- 
  	
  	private void checkMethodSignature(ICPPMethod methodBinding) throws CoreException, DOMException{
 		IIndexName[] methodDecls = projectIndex.findNames(methodBinding, IIndex.FIND_DECLARATIONS);
@@ -530,30 +527,40 @@ public class RefactoringAST {
 	 * @throws CoreException
 	 */
 	private void refactorEnumerations (ICPPASTNamespaceDefinition nsDef) throws CoreException{
-		for (int index=0; index<bindingsSet.size(); index++){
-			IBinding binding = bindingsSet.getList().get(index);
-			
-			//do something with the enumeration
-			if (binding instanceof IEnumeration){
+		try {
+			projectIndex.acquireReadLock();
+		
+			for (int index=0; index<bindingsSet.size(); index++){
+				IBinding binding = bindingsSet.getList().get(index);
 				
-				//get enumeration binding
-				IEnumeration enumeration = (IEnumeration)binding;
-				
-				//find definitions
-				IIndexName[] defs = projectIndex.findDefinitions(enumeration);
-				
-				if (defs.length > 0){
-					IIndexName def    = defs[0];
+				//do something with the enumeration
+				if (binding instanceof IEnumeration){
 					
-					IASTNode fdecl = findNodeFromIndex(def, IASTSimpleDeclaration.class);
+					//get enumeration binding
+					IEnumeration enumeration = (IEnumeration)binding;
 					
-					IASTSimpleDeclaration enumDeclaration = ((IASTSimpleDeclaration)fdecl).copy(CopyStyle.withLocations);
+					//find definitions
+					IIndexName[] defs = projectIndex.findDefinitions(enumeration);
 					
-					//append enumeration to namespace
-					nsDef.addDeclaration(enumDeclaration);
+					if (defs.length > 0){
+						IIndexName def    = defs[0];
+						
+						IASTNode fdecl = findNodeFromIndex(def, IASTSimpleDeclaration.class);
+						
+						IASTSimpleDeclaration enumDeclaration = ((IASTSimpleDeclaration)fdecl).copy(CopyStyle.withLocations);
+						
+						//append enumeration to namespace
+						nsDef.addDeclaration(enumDeclaration);
+					}
 				}
 			}
+		} 
+		catch (InterruptedException e) {
+			e.printStackTrace();
 		}
+ 		finally{
+ 			projectIndex.releaseReadLock();
+ 		}
 	}
 	
 	
@@ -565,71 +572,81 @@ public class RefactoringAST {
 	 * @throws DOMException 
 	 */
 	private void refactorClasses (ICPPNodeFactory nodeFactory, Map<ICPPClassType, List<ICPPMember>> classMembersMap, ICPPASTNamespaceDefinition nsDef) throws CoreException{		
-		for (ICPPClassType owningclass : classMembersMap.keySet()){			
-			
-			//create the class
-			IIndexName[] classDefs = projectIndex.findNames(owningclass, IIndex.FIND_DEFINITIONS);
-			if (classDefs.length != 1 )
-				throw new NoSuchElementException("Class " + owningclass.getName() +" has "+ classDefs.length +" definitions!");
-		
-			ICPPASTCompositeTypeSpecifier newClass = nodeFactory.newCompositeTypeSpecifier(ICPPASTCompositeTypeSpecifier.k_class, nodeFactory.
-																	newName(owningclass.getName()));
-			
-			//if the class inherits from other classes, append this
-			ICPPASTCompositeTypeSpecifier classNode = (ICPPASTCompositeTypeSpecifier)findNodeFromIndex(classDefs[0], ICPPASTCompositeTypeSpecifier.class);
-			for (ICPPASTBaseSpecifier superclass :classNode.getBaseSpecifiers()){
-				newClass.addBaseSpecifier(superclass.copy(CopyStyle.withLocations));
-			}
-						
-			
-			//create members of this class, group the based on their visibilities (//TODO optimise this)
-			List<ICPPMember> membersList = classMembersMap.get(owningclass);
-			int visibilities[] = new int[]{ICPPASTVisibilityLabel.v_public, ICPPASTVisibilityLabel.v_protected, ICPPASTVisibilityLabel.v_private};
-			
-			for (int visibility : visibilities){
-				boolean visLabelAdded = false;
-				
-				for (ICPPMember member : membersList){
-					if (member.getVisibility() != visibility)
-						continue;
-					
-					//add visibility label
-					if (!visLabelAdded){
-						newClass.addDeclaration(nodeFactory.newVisibilityLabel(member.getVisibility()));
-						visLabelAdded = true;
-					}
-	
-					//add declaration
-					IIndexName[] memberDecls = projectIndex.findNames(member, IIndex.FIND_DECLARATIONS); //. Declarations(constructor);
-					if (memberDecls.length > 0){ // its size should be 1
-						IIndexName mDecl    = memberDecls[0];
-						
-						IASTSimpleDeclaration node = (IASTSimpleDeclaration)findNodeFromIndex(mDecl, IASTSimpleDeclaration.class);
-						IASTSimpleDeclaration newDeclaration = (node).copy(CopyStyle.withLocations);
-						
-						newClass.addMemberDeclaration(newDeclaration);
-					}
-					else {//if no declaration exists, try to find a definition and extract the declaration
-						IIndexName[] memberDefs = projectIndex.findNames(member, IIndex.FIND_DEFINITIONS);
-						if (memberDefs.length > 0){ // its size should be 1
-							IIndexName mDef    = memberDefs[0];
-							
-							ICPPASTFunctionDefinition node 	  = (ICPPASTFunctionDefinition) findNodeFromIndex(mDef, ICPPASTFunctionDefinition.class);
-							IASTFunctionDeclarator declarator = node.getDeclarator().copy(CopyStyle.withLocations); 
-							IASTDeclSpecifier      specifier  = node.getDeclSpecifier().copy(CopyStyle.withLocations);
-							IASTSimpleDeclaration newDeclaration = nodeFactory.newSimpleDeclaration(specifier);
-							
-							newDeclaration.addDeclarator(declarator);						
-							newClass.addMemberDeclaration(newDeclaration);	
-						}
-					}
-				}//end member
-			}//end visibitilies
+		try {
+			projectIndex.acquireReadLock();
 
-			//add the new class to the namespace
-			IASTSimpleDeclaration newDeclaration = nodeFactory.newSimpleDeclaration(newClass);
-			nsDef.addDeclaration(newDeclaration);
+			for (ICPPClassType owningclass : classMembersMap.keySet()){			
+				
+				//create the class
+				IIndexName[] classDefs = projectIndex.findNames(owningclass, IIndex.FIND_DEFINITIONS);
+				if (classDefs.length != 1 )
+					throw new NoSuchElementException("Class " + owningclass.getName() +" has "+ classDefs.length +" definitions!");
+			
+				ICPPASTCompositeTypeSpecifier newClass = nodeFactory.newCompositeTypeSpecifier(ICPPASTCompositeTypeSpecifier.k_class, nodeFactory.
+																		newName(owningclass.getName()));
+				
+				//if the class inherits from other classes, append this
+				ICPPASTCompositeTypeSpecifier classNode = (ICPPASTCompositeTypeSpecifier)findNodeFromIndex(classDefs[0], ICPPASTCompositeTypeSpecifier.class);
+				for (ICPPASTBaseSpecifier superclass :classNode.getBaseSpecifiers()){
+					newClass.addBaseSpecifier(superclass.copy(CopyStyle.withLocations));
+				}
+							
+				
+				//create members of this class, group the based on their visibilities (//TODO optimise this)
+				List<ICPPMember> membersList = classMembersMap.get(owningclass);
+				int visibilities[] = new int[]{ICPPASTVisibilityLabel.v_public, ICPPASTVisibilityLabel.v_protected, ICPPASTVisibilityLabel.v_private};
+				
+				for (int visibility : visibilities){
+					boolean visLabelAdded = false;
+					
+					for (ICPPMember member : membersList){
+						if (member.getVisibility() != visibility)
+							continue;
+						
+						//add visibility label
+						if (!visLabelAdded){
+							newClass.addDeclaration(nodeFactory.newVisibilityLabel(member.getVisibility()));
+							visLabelAdded = true;
+						}
+		
+						//add declaration
+						IIndexName[] memberDecls = projectIndex.findNames(member, IIndex.FIND_DECLARATIONS); //. Declarations(constructor);
+						if (memberDecls.length > 0){ // its size should be 1
+							IIndexName mDecl    = memberDecls[0];
+							
+							IASTSimpleDeclaration node = (IASTSimpleDeclaration)findNodeFromIndex(mDecl, IASTSimpleDeclaration.class);
+							IASTSimpleDeclaration newDeclaration = (node).copy(CopyStyle.withLocations);
+							
+							newClass.addMemberDeclaration(newDeclaration);
+						}
+						else {//if no declaration exists, try to find a definition and extract the declaration
+							IIndexName[] memberDefs = projectIndex.findNames(member, IIndex.FIND_DEFINITIONS);
+							if (memberDefs.length > 0){ // its size should be 1
+								IIndexName mDef    = memberDefs[0];
+								
+								ICPPASTFunctionDefinition node 	  = (ICPPASTFunctionDefinition) findNodeFromIndex(mDef, ICPPASTFunctionDefinition.class);
+								IASTFunctionDeclarator declarator = node.getDeclarator().copy(CopyStyle.withLocations); 
+								IASTDeclSpecifier      specifier  = node.getDeclSpecifier().copy(CopyStyle.withLocations);
+								IASTSimpleDeclaration newDeclaration = nodeFactory.newSimpleDeclaration(specifier);
+								
+								newDeclaration.addDeclarator(declarator);						
+								newClass.addMemberDeclaration(newDeclaration);	
+							}
+						}
+					}//end member
+				}//end visibitilies
+	
+				//add the new class to the namespace
+				IASTSimpleDeclaration newDeclaration = nodeFactory.newSimpleDeclaration(newClass);
+				nsDef.addDeclaration(newDeclaration);
+			}
+		} 
+		catch (InterruptedException e) {
+			e.printStackTrace();
 		}
+ 		finally{
+ 			projectIndex.releaseReadLock();
+ 		}
 	}
 	
 	
@@ -642,92 +659,101 @@ public class RefactoringAST {
 	 */
 	private void refactorFunctionImplementations (ICPPNodeFactory nodeFactory, Map<ICPPClassType, List<ICPPMember>> classMembersMap, 
 												 	ICPPASTNamespaceDefinition nsDef) throws CoreException{		
-		
-		for (ICPPClassType owningclass : classMembersMap.keySet()){
+		try {
+			projectIndex.acquireReadLock();
 
-			//create function definitions
-			List<ICPPMember> membersList = classMembersMap.get(owningclass);
-			for (ICPPMember member : membersList){
-			
-				if (member instanceof ICPPMethod){
-					//add definition
-					IIndexName[] methodDefs = projectIndex.findNames(member, IIndex.FIND_DEFINITIONS);
-					
-					if (methodDefs.length > 0){ // its size should be 1
-						IIndexName mDef    = methodDefs[0];
-						ICPPASTFunctionDefinition node = (ICPPASTFunctionDefinition)findNodeFromIndex(mDef, ICPPASTFunctionDefinition.class);
+			for (ICPPClassType owningclass : classMembersMap.keySet()){
+	
+				//create function definitions
+				List<ICPPMember> membersList = classMembersMap.get(owningclass);
+				for (ICPPMember member : membersList){
+				
+					if (member instanceof ICPPMethod){
+						//add definition
+						IIndexName[] methodDefs = projectIndex.findNames(member, IIndex.FIND_DEFINITIONS);
 						
-						//create new function definition
-						//we need to do it manually because of the chain initialisers, added later in this function
-//						ICPPASTFunctionDefinition newFunctionDef = node.copy(CopyStyle.withLocations);
-//						newFunctionDef.setBody(nodeFactory.newCompoundStatement());
-						ICPPASTFunctionDefinition newFunctionDef = nodeFactory.newFunctionDefinition(node.getDeclSpecifier().copy(CopyStyle.withLocations),
-								  																	 node.getDeclarator().copy(CopyStyle.withLocations),
-								  																	 nodeFactory.newCompoundStatement());
-																		
-						//manage function declarator qualified names so that are in the form Class::Function(...){}, in cpp file. 
-						//if the specifier of this function does not include class name (e.g., defined in header) modify this
-						ICPPASTFunctionDeclarator fDecl = (ICPPASTFunctionDeclarator) newFunctionDef.getDeclarator();
-						if (!(fDecl.getName() instanceof ICPPASTQualifiedName)){
-							ICPPASTQualifiedName qualName =  nodeFactory.newQualifiedName(new String[]{owningclass.getName()}, member.getName());
-							fDecl.setName(qualName);
-						}
-						
-						//manage initialiser lists: any constructor (superclass) initialisers should be added here 
-						for (ICPPASTConstructorChainInitializer initialiser: node.getMemberInitializers()){
-							IASTName initialiserName = initialiser.getMemberInitializerId();
-							IBinding initialiserBinding = initialiserName.resolveBinding(); 
+						if (methodDefs.length > 0){ // its size should be 1
+							IIndexName mDef    = methodDefs[0];
+							ICPPASTFunctionDefinition node = (ICPPASTFunctionDefinition)findNodeFromIndex(mDef, ICPPASTFunctionDefinition.class);
 							
-							if ( (initialiserBinding instanceof ICPPConstructor) ){
-								IBinding bindingClass = initialiserBinding.getOwner();
-								if (classMembersMap.keySet().contains(bindingClass))
-									newFunctionDef.addMemberInitializer(initialiser.copy(CopyStyle.withLocations));
-								else 
-									throw new IllegalArgumentException("Class " + bindingClass + "not found!");	
+							//create new function definition
+							//we need to do it manually because of the chain initialisers, added later in this function
+	//						ICPPASTFunctionDefinition newFunctionDef = node.copy(CopyStyle.withLocations);
+	//						newFunctionDef.setBody(nodeFactory.newCompoundStatement());
+							ICPPASTFunctionDefinition newFunctionDef = nodeFactory.newFunctionDefinition(node.getDeclSpecifier().copy(CopyStyle.withLocations),
+									  																	 node.getDeclarator().copy(CopyStyle.withLocations),
+									  																	 nodeFactory.newCompoundStatement());
+																			
+							//manage function declarator qualified names so that are in the form Class::Function(...){}, in cpp file. 
+							//if the specifier of this function does not include class name (e.g., defined in header) modify this
+							ICPPASTFunctionDeclarator fDecl = (ICPPASTFunctionDeclarator) newFunctionDef.getDeclarator();
+							if (!(fDecl.getName() instanceof ICPPASTQualifiedName)){
+								ICPPASTQualifiedName qualName =  nodeFactory.newQualifiedName(new String[]{owningclass.getName()}, member.getName());
+								fDecl.setName(qualName);
 							}
-						}
-						
-						//manage return function specifiers
-						IASTDeclSpecifier declSpecifier 	= node.getDeclSpecifier();
-						IASTReturnStatement returnStatement	= nodeFactory.newReturnStatement(null);
-						//if the return type is simple specifier except void --> add a null return statement
-						if ( (declSpecifier instanceof IASTSimpleDeclSpecifier) && 
-							 (((IASTSimpleDeclSpecifier)declSpecifier).getType() > IASTSimpleDeclSpecifier.t_void) ){
-							returnStatement.setReturnValue(nodeFactory.newLiteralExpression(IASTLiteralExpression.lk_nullptr, "NULL"));
-						}
-						//if the return type is a qualified name (e.g., class, enumeration etc) --> 
-						//   if it is a class --> add a null return statement
-						//   if it is an enumerator --> select a random enum item
-						else if (declSpecifier instanceof ICPPASTNamedTypeSpecifier){
-							IASTName declName 		= ((ICPPASTNamedTypeSpecifier) declSpecifier).getName();
-							IBinding declBinding	= declName.resolveBinding();
-
-							if (declBinding instanceof ICPPEnumeration){
-								IIndexName[] enumDefs = projectIndex.findNames(declBinding, IIndex.FIND_DEFINITIONS);
-								if (enumDefs.length > 0){ // its size should be 1
-									IIndexName enumDef    = enumDefs[0];
-									IASTEnumerationSpecifier enumNode 	  = (IASTEnumerationSpecifier) findNodeFromIndex(enumDef, IASTEnumerationSpecifier.class);
-									if (enumNode.getEnumerators().length !=1)
-										returnStatement.setReturnValue(nodeFactory.newLiteralExpression(IASTLiteralExpression.lk_false, enumNode.getEnumerators()[0].getName().toString()));
+							
+							//manage initialiser lists: any constructor (superclass) initialisers should be added here 
+							for (ICPPASTConstructorChainInitializer initialiser: node.getMemberInitializers()){
+								IASTName initialiserName = initialiser.getMemberInitializerId();
+								IBinding initialiserBinding = initialiserName.resolveBinding(); 
+								
+								if ( (initialiserBinding instanceof ICPPConstructor) ){
+									IBinding bindingClass = initialiserBinding.getOwner();
+									if (classMembersMap.keySet().contains(bindingClass))
+										newFunctionDef.addMemberInitializer(initialiser.copy(CopyStyle.withLocations));
 									else 
-										throw new IllegalArgumentException("Enumerator " + declBinding + "not found!");	
+										throw new IllegalArgumentException("Class " + bindingClass + "not found!");	
 								}
 							}
-							else
+							
+							//manage return function specifiers
+							IASTDeclSpecifier declSpecifier 	= node.getDeclSpecifier();
+							IASTReturnStatement returnStatement	= nodeFactory.newReturnStatement(null);
+							//if the return type is simple specifier except void --> add a null return statement
+							if ( (declSpecifier instanceof IASTSimpleDeclSpecifier) && 
+								 (((IASTSimpleDeclSpecifier)declSpecifier).getType() > IASTSimpleDeclSpecifier.t_void) ){
 								returnStatement.setReturnValue(nodeFactory.newLiteralExpression(IASTLiteralExpression.lk_nullptr, "NULL"));
-								
+							}
+							//if the return type is a qualified name (e.g., class, enumeration etc) --> 
+							//   if it is a class --> add a null return statement
+							//   if it is an enumerator --> select a random enum item
+							else if (declSpecifier instanceof ICPPASTNamedTypeSpecifier){
+								IASTName declName 		= ((ICPPASTNamedTypeSpecifier) declSpecifier).getName();
+								IBinding declBinding	= declName.resolveBinding();
+	
+								if (declBinding instanceof ICPPEnumeration){
+									IIndexName[] enumDefs = projectIndex.findNames(declBinding, IIndex.FIND_DEFINITIONS);
+									if (enumDefs.length > 0){ // its size should be 1
+										IIndexName enumDef    = enumDefs[0];
+										IASTEnumerationSpecifier enumNode 	  = (IASTEnumerationSpecifier) findNodeFromIndex(enumDef, IASTEnumerationSpecifier.class);
+										if (enumNode.getEnumerators().length !=1)
+											returnStatement.setReturnValue(nodeFactory.newLiteralExpression(IASTLiteralExpression.lk_false, enumNode.getEnumerators()[0].getName().toString()));
+										else 
+											throw new IllegalArgumentException("Enumerator " + declBinding + "not found!");	
+									}
+								}
+								else
+									returnStatement.setReturnValue(nodeFactory.newLiteralExpression(IASTLiteralExpression.lk_nullptr, "NULL"));
+									
+							}
+							IASTCompoundStatement compoundStatement = (IASTCompoundStatement) newFunctionDef.getBody();
+							compoundStatement.addStatement(returnStatement);
+	
+	
+							//add the new definition to the namespace
+							nsDef.addDeclaration(newFunctionDef);
 						}
-						IASTCompoundStatement compoundStatement = (IASTCompoundStatement) newFunctionDef.getBody();
-						compoundStatement.addStatement(returnStatement);
-
-
-						//add the new definition to the namespace
-						nsDef.addDeclaration(newFunctionDef);
+						
 					}
-					
 				}
-			}
-		}				
+			}			
+		} 
+		catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+ 		finally{
+ 			projectIndex.releaseReadLock();
+ 		}
 	}
 	
 	
@@ -792,7 +818,7 @@ public class RefactoringAST {
 //        System.out.println("In-degrees: " + bindingsGraph.inDegree());
 //        System.out.println("Out-degrees: " + bindingsGraph.outDegree());
         System.out.println("\nA topological sort of the vertices: " + bindingsGraph.topSort());
-        System.out.println("The graph " + (bindingsGraph.isDag()?"is":"is not") + " a dag\n");
+//        System.out.println("The graph " + (bindingsGraph.isDag()?"is":"is not") + " a dag\n");
 		
 		List<ICPPClassType> topSortedBindings = bindingsGraph.topSort();
 		LinkedHashMap<ICPPClassType, List<ICPPMember>> sortedClassMembersMap = new LinkedHashMap<ICPPClassType, List<ICPPMember>>(); 
