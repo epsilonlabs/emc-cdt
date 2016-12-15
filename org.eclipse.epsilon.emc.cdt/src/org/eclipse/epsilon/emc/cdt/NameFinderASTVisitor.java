@@ -21,6 +21,7 @@ import org.eclipse.cdt.core.dom.ast.IASTSimpleDeclaration;
 import org.eclipse.cdt.core.dom.ast.IBinding;
 import org.eclipse.cdt.core.dom.ast.IScope;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPNamespaceScope;
+import org.eclipse.cdt.internal.core.dom.parser.cpp.ICPPUnknownBinding;
 
 	
 
@@ -169,6 +170,11 @@ public class NameFinderASTVisitor extends ASTVisitor {
 		try {
 			
 			// while not reached a namespace scope
+			if ( (binding==null) || (binding.getScope()==null) 
+					|| (binding instanceof ICPPUnknownBinding) ){
+				System.out.println("NULL\t" + name +"\t"+ binding.getClass().getSimpleName());
+				return;
+			}
 			IScope scope = binding.getScope();
 			while (!((scope != null) && (scope instanceof ICPPNamespaceScope))) {
 				scope = scope.getParent();
@@ -180,7 +186,7 @@ public class NameFinderASTVisitor extends ASTVisitor {
 				appendToLists(name, binding, node);
 //				return true;
 
-		} catch (DOMException e) {
+		} catch (DOMException | NullPointerException e) {
 			e.printStackTrace();
 		}
 //		return false;
@@ -201,7 +207,6 @@ public class NameFinderASTVisitor extends ASTVisitor {
 
 
 
-@Deprecated
 class NameFinderASTVisitorDep extends ASTVisitor{
 	/**List keeping all function calls **/
 	private List<IASTName> namesList;

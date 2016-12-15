@@ -214,7 +214,7 @@ public class CdtModel extends CachedModel<Object>{
 		visitor = new ReflectiveASTVisitor(cproject, resolveBindings);
 		
 		//init refactor
-		refactor = new RefactoringAST(cproject, visitor.getAST());
+		refactor = new RefactoringAST(cproject);
 		
 		//finally load model
 		load();
@@ -258,13 +258,10 @@ public class CdtModel extends CachedModel<Object>{
 	 */
 	@Override
  	public boolean store() {
-//		System.out.println(getClass().getSimpleName() +".store()");
+		System.out.println(getClass().getSimpleName() +".store()");
 //		refactor.addNewFunction("func");
 //		refactor.replaceFunction("test", "testMe");
-//		refactor.refactorNameSpace("tinyxml2");
-//		refactor.refactor(new String[]{"tinyxml2.cpp", "tinyxml2.h"});
-//		return refactor.
-		//		return visitor.saveAST();
+		refactor.refactor(new String[]{"tinyxml2.cpp", "tinyxml2.h"});
 		return true;
 	}
 

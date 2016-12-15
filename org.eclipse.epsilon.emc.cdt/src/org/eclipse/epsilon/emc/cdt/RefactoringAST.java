@@ -48,6 +48,7 @@ import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
 import org.eclipse.cdt.core.dom.ast.IBinding;
 import org.eclipse.cdt.core.dom.ast.IEnumeration;
 import org.eclipse.cdt.core.dom.ast.IFunction;
+import org.eclipse.cdt.core.dom.ast.IProblemBinding;
 import org.eclipse.cdt.core.dom.ast.IScope;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTCompositeTypeSpecifier;
 import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTCompositeTypeSpecifier.ICPPASTBaseSpecifier;
@@ -76,6 +77,7 @@ import org.eclipse.cdt.core.index.IIndexName;
 import org.eclipse.cdt.core.model.CoreModelUtil;
 import org.eclipse.cdt.core.model.ICProject;
 import org.eclipse.cdt.core.model.ITranslationUnit;
+import org.eclipse.cdt.internal.core.dom.parser.cpp.ICPPUnknownBinding;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
@@ -133,6 +135,8 @@ public class RefactoringAST {
 			/**Pairs of ITranslationUnit, List<IASTName>, where List
 			 * <IASTName> keeps the IASTNames used from the legacy library **/
 			HashMap<ITranslationUnit, List<IASTName>> libraryCache = new HashMap<>();
+			
+			List<ITranslationUnit> tusUsingLibList = new ArrayList<ITranslationUnit>();
 
 			// find all translation units
 			List<ITranslationUnit> tuList = CdtUtilities.getProjectTranslationUnits(cproject, excludedFiles);
@@ -157,12 +161,15 @@ public class RefactoringAST {
 					namesSet.addAll(fcVisitor.namesSet);
 					bindingsSet.addAll(fcVisitor.bindingsSet);
 					nodesList.addAll(fcVisitor.nodesList);
+					tusUsingLibList.add(tu);
 				}
 			}
 			
 			//FIXME: -ea VM flag does not work - how to enable assertions?
 //			assert(namesSet.size() == bindingsSet.size());
 //			assert(namesSet.size() == nodesList.size());
+			
+			System.out.println(Arrays.toString(tusUsingLibList.toArray()));
 			
 			//check for library uses within the same library
 			checkReferences();
@@ -940,6 +947,14 @@ public class RefactoringAST {
 			try {
 				
 				// while not reached a namespace scope
+				if ( (binding==null) || (binding instanceof IProblemBinding) 
+						|| (binding.getScope()==null) 
+						|| (binding instanceof ICPPUnknownBinding) 
+						){
+					System.out.println("NULL\t" + name +"\t"+ binding.getClass().getSimpleName());
+					return;
+				}
+
 				IScope scope = binding.getScope();
 				while (!((scope != null) && (scope instanceof ICPPNamespaceScope))) {
 					scope = scope.getParent();
