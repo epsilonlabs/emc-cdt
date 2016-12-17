@@ -424,31 +424,42 @@ public class RefactoringAST {
 			// get node factory
 			ICPPNodeFactory nodeFactory = (ICPPNodeFactory) headerAST.getASTNodeFactory();
 
-			//1) add include directives
+			//1) Add preprocessor ifdef statements
+			IASTName ifnDefStm  = nodeFactory.newName("#ifndef LIBXML_INCLUDED");
+			IASTName defStm 	= nodeFactory.newName("#define LIBXML_INCLUDED");
+			rewriter.insertBefore(headerAST, null, ifnDefStm, null);
+			rewriter.insertBefore(headerAST, null, defStm, null);
+			
+			//2) add include directives
 			for (IASTName name : includeDirectivesMap.keySet()){
 				String includeDirective = includeDirectivesMap.get(name);
 				IASTName includeDir = nodeFactory.newName("#include <" + includeDirective +">");
 				rewriter.insertBefore(headerAST, null, includeDir, null);
 			}
 			
-			//2) add using directives
+			//3) add using directives
 //			ICPPASTUsingDirective usingDirective = nodeFactory.newUsingDirective(nodeFactory.newName("tinyxml2"));
 //			rewriter.insertBefore(libAST, null, usingDirective, null);
 
-			//3) add namespace definition
+			//4) add namespace definition
 			ICPPASTNamespaceDefinition nsDef = nodeFactory.newNamespaceDefinition(nodeFactory.newName(myNAMESPACE));
 			
-			//4) create forward declarations
+			//5) create forward declarations
 			refactorForwardDeclarations(nsDef, nodeFactory, classMembersMap.keySet());
 			
-			//5) Refactor enumerations
+			//6) Refactor enumerations
 			refactorEnumerations(nsDef);
 			
-			//6) Refactor classes and methods
+			//7) Refactor classes and methods
 			refactorClasses(nodeFactory, classMembersMap, nsDef);
 			
-			//7) add namespace to ast
+			//9) add namespace to ast
 			rewriter.insertBefore(headerAST, null, nsDef, null);
+			
+			//10) add endif preprocessor statement
+			IASTName endIfStm 	= nodeFactory.newName("#endif //LIBXML_INCLUDED");
+			rewriter.insertBefore(headerAST, null, endIfStm, null);
+
 			rewriter.rewriteAST().perform(new NullProgressMonitor()); 
 		} 
 		catch (NoSuchFileException | CoreException e) {
