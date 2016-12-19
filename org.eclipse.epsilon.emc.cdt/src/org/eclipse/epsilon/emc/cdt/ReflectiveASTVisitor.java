@@ -19,7 +19,6 @@ import java.util.List;
 import org.eclipse.cdt.core.CCorePlugin;
 import org.eclipse.cdt.core.dom.ast.ASTGenericVisitor;
 import org.eclipse.cdt.core.dom.ast.ASTVisitor;
-import org.eclipse.cdt.core.dom.ast.IASTDeclaration;
 import org.eclipse.cdt.core.dom.ast.IASTDeclarator;
 import org.eclipse.cdt.core.dom.ast.IASTExpression;
 import org.eclipse.cdt.core.dom.ast.IASTFunctionCallExpression;
@@ -30,7 +29,6 @@ import org.eclipse.cdt.core.dom.ast.cpp.ICPPASTNamespaceDefinition;
 import org.eclipse.cdt.core.index.IIndex;
 import org.eclipse.cdt.core.model.CModelException;
 import org.eclipse.cdt.core.model.CoreModelUtil;
-import org.eclipse.cdt.core.model.ICContainer;
 import org.eclipse.cdt.core.model.ICElement;
 import org.eclipse.cdt.core.model.ICProject;
 import org.eclipse.cdt.core.model.ISourceRoot;
@@ -286,12 +284,35 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		return elements;
 	}
 	
+	
+	protected Collection<Object> getAllofTypeVisitor(String type){
+		List<Object> nodes = new ArrayList<Object>();
+		mainAST.accept(new ASTVisitor() {
+			{
+				shouldVisitTranslationUnit = true;
+				shouldVisitNamespaces   = true;
+			}
+			
+			@Override
+			public int visit(ICPPASTNamespaceDefinition namespaceDefinition) {
+				nodes.add(namespaceDefinition);
+				return PROCESS_CONTINUE;
+			}
+			@Override
+			public int visit(IASTTranslationUnit iast) {
+				System.out.println(iast.getOriginatingTranslationUnit());
+				return PROCESS_CONTINUE;
+			}
+		});
+		return nodes;
+	}
+	
+	
 	@Override
 	protected int genericVisit(IASTNode node) {
 //			System.out.println(node.getRawSignature());
 		return PROCESS_CONTINUE;
 	}
-
 	
 	@Override
 	public int visit(IASTDeclarator declarator) {
