@@ -1,0 +1,61 @@
+
+/***************************************************/
+/* Using the Translation unit
+/***************************************************/
+
+//find this project
+var project = ICProject.all.first;
+
+
+//find all the source (.c & .cpp) & header (.h & .hpp) files
+var files = ITranslationUnit.all();
+
+
+//print names and namespaces
+"\n------------------------------------".println("All files and their namespaces");
+for (file in files){
+	file.getElementName.print();
+	file.getNamespaces.println("\t\t");
+}
+
+//select tinyxml files
+"\n------------------------------------".println("\n\nFiles whose namespace is tinyxml2");
+var libraryFiles = files.select (f | (f.getNamespaces.exists(n | n.name.equals("tinyxml2"))) );
+libraryFiles.println();
+
+
+//select those whose namespace is not tinyxml
+"\n------------------------------------".println("\n\nFiles whose namespace is NOT tinyxml2");
+var sourceFiles = files.select (f | (not libraryFiles.contains(f)));
+	//Verbose way
+	  //var sourceFiles = new Sequence;
+	  //for (file in files){
+		//if (not file.getNamespaces.exists(n | n.getElementName.equals("tinyxml2"))){
+			//	sourceFiles.add(file);
+			//}
+		//}
+
+sourceFiles.println();
+
+
+
+//find all function definitions and function declarations in library header files
+"\n------------------------------------".println("\n\nFunction declarations in library header files");
+var headerFile = null;
+for (libFile in libraryFiles){
+	if (libFile.isHeaderUnit()){
+		//libFile.name.println();
+		project.tu  = libFile;
+		break;
+	}
+}
+
+
+var libFunctions = new Sequence;
+libFunctions = FunctionDeclarator.all;
+libFunctions.size.println();
+//libFunctions.first.class.println();
+for (i in Sequence{1..20}){
+	libFunctions.at(i).rawSignature.println();
+}
+
