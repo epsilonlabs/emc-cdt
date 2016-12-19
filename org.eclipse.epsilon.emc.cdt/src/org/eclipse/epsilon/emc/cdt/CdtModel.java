@@ -53,8 +53,6 @@ public class CdtModel extends CachedModel<Object>{
 	/** Visitor element*/
 	private ReflectiveASTVisitor visitor = null;
 	
-	/** Refactoring element*/
-	private RefactoringAST refactor = null;
 	
 	/** Property getter */
 	protected CdtPropertyGetter propertyGetter = new CdtPropertyGetter();
@@ -90,6 +88,7 @@ public class CdtModel extends CachedModel<Object>{
 		throw new UnsupportedOperationException("getElementId(..) not Implemented");
 	}
 
+	
 	@Override
  	public void setElementId(Object instance, String newId) {
 		System.out.println(getClass().getSimpleName() +".setElementId(..)");
@@ -123,9 +122,10 @@ public class CdtModel extends CachedModel<Object>{
 
 	@Override
 	protected Collection<Object> allContentsFromModel() {
-		System.out.println(getClass().getSimpleName() +".allContentsFromModel(..)");
+//		System.out.println(getClass().getSimpleName() +".allContentsFromModel(..)");
 		throw new UnsupportedOperationException("allContentsFromModel(..) not Implemented");
 	}	
+	
 	
 	@Override
  	public Collection<Object> getAllOfKind(String kind) throws EolModelElementTypeNotFoundException {
@@ -135,7 +135,7 @@ public class CdtModel extends CachedModel<Object>{
 
 	
  	public Collection<Object> getAllOfType(String type) throws EolModelElementTypeNotFoundException {
-		System.out.println(getClass().getSimpleName() +".getAllOfType(..)");
+//		System.out.println(getClass().getSimpleName() +".getAllOfType(..)");
 		return super.getAllOfType(type);
 	}
 	
@@ -156,18 +156,16 @@ public class CdtModel extends CachedModel<Object>{
 	
 	@Override
  	protected Object createInstanceInModel(String type) throws EolModelElementTypeNotFoundException, EolNotInstantiableModelElementTypeException {
-		System.out.println(getClass().getSimpleName() +".createInstanceInModel(..)");
+//		System.out.println(getClass().getSimpleName() +".createInstanceInModel(..)");
 		throw new UnsupportedOperationException("createInstanceInModel(..) not Implemented");
 	}
 
 	
 	@Override
  	protected void disposeModel() {
-//		System.out.println(getClass().getSimpleName() +".disposeModel(..)");
 		cproject 		= null;
 		resolveBindings = false;
 		visitor 		= null;
-		refactor		= null;
 	}
 
 	
@@ -213,9 +211,6 @@ public class CdtModel extends CachedModel<Object>{
 		//init visitor
 		visitor = new ReflectiveASTVisitor(cproject, resolveBindings);
 		
-		//init refactor
-		refactor = new RefactoringAST(cproject);
-		
 		//finally load model
 		load();
 	}
@@ -259,9 +254,6 @@ public class CdtModel extends CachedModel<Object>{
 	@Override
  	public boolean store() {
 		System.out.println(getClass().getSimpleName() +".store()");
-//		refactor.addNewFunction("func");
-//		refactor.replaceFunction("test", "testMe");
-		refactor.refactor(new String[]{"tinyxml2.cpp", "tinyxml2.h"});
 		return true;
 	}
 
@@ -271,7 +263,6 @@ public class CdtModel extends CachedModel<Object>{
 	 */
 	@Override
 	public IPropertyGetter getPropertyGetter() {
-//		System.out.println(getClass().getSimpleName() +".getPropertyGetter(..)");
 		return propertyGetter;
 	}
 	

@@ -39,6 +39,7 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 
 public class CdtUtilities {
+	
 	private CdtUtilities() {}
 	
 	
@@ -120,6 +121,7 @@ public class CdtUtilities {
 		return CdtUtilities.getICProject(getIProject(projectName));
 	}
 	
+	
 	/**
 	 * Get a list of ICProjects
 	 * @param projects
@@ -190,7 +192,6 @@ public class CdtUtilities {
 	
 
 		
-	
 	
 	/**
 	 * Returns as List all the translation units for the given project.

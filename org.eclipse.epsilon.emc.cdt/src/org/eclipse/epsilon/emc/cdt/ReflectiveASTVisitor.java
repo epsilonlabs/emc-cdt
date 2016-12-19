@@ -206,25 +206,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 			throw new NoSuchMethodException(String.format("main() method not found in project %s", cproject.getProject().getName()));
 		return;
 	}	
-		
-	
-	/**
-	 * Save the ast
-	 * @deprecated
-	 * @return
-	 */
-	protected boolean saveAST(){
-		try {			
-			if (mainTU.hasUnsavedChanges())
-				mainTU.save(new NullProgressMonitor(), true);
-			return true;
-		} 
-		catch (CModelException e) {
-			e.printStackTrace();
-			return false;
-		}
-	}
-	
+			
 	
 	/**
 	 * Return AST
