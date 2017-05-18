@@ -14,9 +14,9 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 import org.eclipse.cdt.core.index.IIndexFile;
 import org.eclipse.cdt.core.index.IIndexName;
@@ -201,14 +201,12 @@ public class CdtUtilities {
 	 * @param excludedFiles an array of filenames for which a translation unit <b>won't</b> be generated
 	 * @return
 	 */
-	public static List<ITranslationUnit> getProjectTranslationUnits (ICProject cproject,  String[] excludedFiles) {
+	public static List<ITranslationUnit> getProjectTranslationUnits (ICProject cproject,  Set<String> excludedFilesSet) {
 		List<ITranslationUnit> tuList = new ArrayList<ITranslationUnit>();
-		
-		HashSet<String> excludedFilesSet = new HashSet<String>(Arrays.asList(excludedFiles));
 		
 		//get source folders
 		try {
-			for (ISourceRoot sourceRoot : cproject.getSourceRoots()){
+			for (ISourceRoot sourceRoot : cproject. getSourceRoots()){
 //				System.out.println(sourceRoot.getLocationURI().getPath());
 				//get all elements
 				for (ICElement element : sourceRoot.getChildren()){
@@ -219,7 +217,7 @@ public class CdtUtilities {
 					}
 					else{
 						ITranslationUnit tu		= (ITranslationUnit) element;
-						if (! excludedFilesSet.contains(tu.getFile().getName()))
+						if (! excludedFilesSet.contains((tu.getFile().getLocation().toString())))
 							tuList.add(tu);
 					}
 
@@ -228,17 +226,17 @@ public class CdtUtilities {
 		} catch (CModelException e) {
 			e.printStackTrace();
 		}
-		return tuList;			
+		return tuList;
 	}
 	
 	
-	private static void recursiveContainerTraversal (ICContainer container, List<ITranslationUnit> tuList, HashSet<String> excludedFilesSet) throws CModelException{
+	private static void recursiveContainerTraversal (ICContainer container, List<ITranslationUnit> tuList, Set<String> excludedFilesSet) throws CModelException{
 		for (ICContainer inContainer : container.getCContainers()){
 			recursiveContainerTraversal(inContainer, tuList, excludedFilesSet);
 		}
 		
 		for (ITranslationUnit tu : container.getTranslationUnits()){
-			if (! excludedFilesSet.contains(tu.getFile().getName()))
+			if (! excludedFilesSet.contains((tu.getFile().getLocation().toString())))
 				tuList.add(tu);			
 		}
 	}

@@ -106,13 +106,13 @@ public class CdtModel extends CachedModel<Object>{
 	@Override
  	public boolean hasType(String type) {
 		try{
-//			System.out.println(getClass().getSimpleName() +".hasType(..)");
+			System.out.println(getClass().getSimpleName() +".hasType(..)");
 			return supportedTypes.contains(type) 
-					|| (Class.forName("org.eclipse.cdt.core.dom.ast.IAST" + type) != null);
+					|| (Class.forName("org.eclipse.cdt.core.dom.ast." + type) != null);
 		} 
 		catch (ClassNotFoundException e) {
 			try {
-				return (Class.forName("org.eclipse.cdt.core.dom.ast.cpp.ICPPAST" + type) != null);
+				return (Class.forName("org.eclipse.cdt.core.dom.ast.cpp." + type) != null);
 			} catch (ClassNotFoundException e1) {
 //				e1.printStackTrace();
 				return false;
@@ -122,41 +122,42 @@ public class CdtModel extends CachedModel<Object>{
 
 	@Override
 	protected Collection<Object> allContentsFromModel() {
-//		System.out.println(getClass().getSimpleName() +".allContentsFromModel(..)");
+		System.out.println(getClass().getSimpleName() +".allContentsFromModel(..)");
 		throw new UnsupportedOperationException("allContentsFromModel(..) not Implemented");
 	}	
 	
 	
 	@Override
  	public Collection<Object> getAllOfKind(String kind) throws EolModelElementTypeNotFoundException {
-//		System.out.println(getClass().getSimpleName() +".getAllOfKind(..)");
+		System.out.println(getClass().getSimpleName() +".getAllOfKind(..)");
 		return super.getAllOfKind(kind);
 	}
 
 	
  	public Collection<Object> getAllOfType(String type) throws EolModelElementTypeNotFoundException {
-//		System.out.println(getClass().getSimpleName() +".getAllOfType(..)");
+		System.out.println(getClass().getSimpleName() +".getAllOfType(..)");
 		return super.getAllOfType(type);
 	}
 	
 	
 	@Override
  	protected Collection<Object> getAllOfKindFromModel(String kind) throws EolModelElementTypeNotFoundException {
-//		System.out.println(getClass().getSimpleName() +".getAllOfKindFromModel(..)");
-		return getAllOfTypeFromModel(kind);
+		System.out.println(getClass().getSimpleName() +".getAllOfKindFromModel(..)");
+//		return getAllOfTypeFromModel(kind); 
+		return visitor.getAllofKind(kind);
 	}
 	
 	
 	@Override
  	protected Collection<Object> getAllOfTypeFromModel(String type) throws EolModelElementTypeNotFoundException {
-//		System.out.println(getClass().getSimpleName() +".getAllOfTypeFromModel(..)");
+		System.out.println(getClass().getSimpleName() +".getAllOfTypeFromModel(..)");
 		return visitor.getAllofType(type);
 	}
 
 	
 	@Override
  	protected Object createInstanceInModel(String type) throws EolModelElementTypeNotFoundException, EolNotInstantiableModelElementTypeException {
-//		System.out.println(getClass().getSimpleName() +".createInstanceInModel(..)");
+		System.out.println(getClass().getSimpleName() +".createInstanceInModel(..)");
 		throw new UnsupportedOperationException("createInstanceInModel(..) not Implemented");
 	}
 
@@ -195,6 +196,7 @@ public class CdtModel extends CachedModel<Object>{
 	 */
 	@Override
  	public void load(StringProperties properties, IRelativePathResolver resolver) throws EolModelLoadingException {
+		System.out.println(getClass().getSimpleName() +".load()");
 		super.load(properties, resolver);
 		
 		//get project name
@@ -230,7 +232,7 @@ public class CdtModel extends CachedModel<Object>{
 	 */
 	@Override
   	public boolean owns (Object object){
-//		System.out.println(object.getClass().getSimpleName() +"\t"+ (object instanceof IASTNode));
+		System.out.println(object.getClass().getSimpleName() +"\t"+ (object instanceof IASTNode));
 		if ( (object instanceof ICElement) || (object instanceof IASTNode) ){
 			return true;
 		}
@@ -282,7 +284,7 @@ public class CdtModel extends CachedModel<Object>{
 		try {
 			visitor.setAST(tu);
 		} 
-		catch (UnexpectedException | CoreException e) {
+		catch (CoreException | UnexpectedException e) {
 			e.printStackTrace();
 		}
 	}
