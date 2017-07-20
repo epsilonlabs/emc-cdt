@@ -53,13 +53,16 @@ public class CdtModel extends CachedModel<Object>{
 	/** Visitor element*/
 	private ReflectiveASTVisitor visitor = null;
 	
-	
 	/** Property getter */
 	protected CdtPropertyGetter propertyGetter = new CdtPropertyGetter();
 
 	/** Property setter */
 	protected CdtPropertySetter propertySetter = new CdtPropertySetter(this);
+	
+	/** Flag indicating whether to check AST or CModel*/
+	private boolean visitAST = true;
 
+	
 	
 	@Override
 	public Object getEnumerationValue(String enumeration, String label) throws EolEnumerationValueNotFoundException {
@@ -103,23 +106,42 @@ public class CdtModel extends CachedModel<Object>{
 	}
 
 	
+	/** 
+	 * Checks whether the given type is part of AST or CModel hierarchy
+	 */
 	@Override
  	public boolean hasType(String type) {
 		try{
 			System.out.println(getClass().getSimpleName() +".hasType(..)");
-			return supportedTypes.contains(type) 
-					|| (Class.forName("org.eclipse.cdt.core.dom.ast." + type) != null);
+//			return supportedTypes.contains(type) 
+//					|| (Class.forName("org.eclipse.cdt.core.dom.ast." + type) != null);
+			if (Class.forName("org.eclipse.cdt.core.dom.ast." + type) != null){
+				visitAST = true;
+				return true;
+			}
 		} 
 		catch (ClassNotFoundException e) {
 			try {
-				return (Class.forName("org.eclipse.cdt.core.dom.ast.cpp." + type) != null);
+				if (Class.forName("org.eclipse.cdt.core.dom.ast.cpp." + type) != null){
+					visitAST = true;
+					return true;					
+				}
 			} catch (ClassNotFoundException e1) {
-//				e1.printStackTrace();
-				return false;
+				try {
+					if (Class.forName("org.eclipse.cdt.core.model." + type) != null){
+						visitAST = false;
+						return true;
+					}
+				} catch (ClassNotFoundException e2) {
+//					e2.printStackTrace();
+					return false;
+				}
 			}
-		}		
+		}
+		return false;
 	}
 
+	
 	@Override
 	protected Collection<Object> allContentsFromModel() {
 		System.out.println(getClass().getSimpleName() +".allContentsFromModel(..)");
@@ -144,14 +166,14 @@ public class CdtModel extends CachedModel<Object>{
  	protected Collection<Object> getAllOfKindFromModel(String kind) throws EolModelElementTypeNotFoundException {
 		System.out.println(getClass().getSimpleName() +".getAllOfKindFromModel(..)");
 //		return getAllOfTypeFromModel(kind); 
-		return visitor.getAllofKind(kind);
+		return visitor.getAllofKind(kind, visitAST);
 	}
 	
 	
 	@Override
  	protected Collection<Object> getAllOfTypeFromModel(String type) throws EolModelElementTypeNotFoundException {
 		System.out.println(getClass().getSimpleName() +".getAllOfTypeFromModel(..)");
-		return visitor.getAllofType(type);
+		return visitor.getAllofType(type, visitAST);
 	}
 
 	
@@ -228,7 +250,7 @@ public class CdtModel extends CachedModel<Object>{
 
 	
 	/**
-	 * Check whether it is the given object is owned
+	 * Check whether the given object is owned
 	 */
 	@Override
   	public boolean owns (Object object){

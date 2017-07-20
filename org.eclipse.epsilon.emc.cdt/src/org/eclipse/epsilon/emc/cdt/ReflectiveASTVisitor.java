@@ -25,6 +25,8 @@ import org.eclipse.cdt.core.dom.ast.ASTGenericVisitor;
 import org.eclipse.cdt.core.dom.ast.IASTNode;
 import org.eclipse.cdt.core.dom.ast.IASTTranslationUnit;
 import org.eclipse.cdt.core.index.IIndex;
+import org.eclipse.cdt.core.model.ICElement;
+import org.eclipse.cdt.core.model.ICElementVisitor;
 import org.eclipse.cdt.core.model.ICProject;
 import org.eclipse.cdt.core.model.ITranslationUnit;
 import org.eclipse.core.runtime.CoreException;
@@ -34,14 +36,10 @@ import org.eclipse.ui.PlatformUI;
 
 
 @SuppressWarnings("restriction")
-public class ReflectiveASTVisitor extends ASTGenericVisitor {
+public class ReflectiveASTVisitor implements IReflectiveVisitor{// extends ASTGenericVisitor {
 
 	/** project */
 	protected ICProject cproject = null;
-
-//	/** Resolve bindings flag */
-//	@Deprecated
-//	private boolean resolveBindings = false;
 
 	/** Source file that includes a main function of the c program*/
  	private ITranslationUnit mainTU = null;
@@ -60,6 +58,9 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 	
 	/** Flag indicating whether superclasses (of kind) should be checked*/
 	protected boolean checkOfKind = false;
+	
+	/** Flag indicating whether to check AST or CModel*/
+	protected boolean checkAST = true;
 
 	
 	/**
@@ -68,7 +69,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 	 * @param aProject
 	 */
 	public ReflectiveASTVisitor(ICProject project, boolean resolveBindings) {
-		super(true);
+//		super(true);
 		try {
 			this.cproject = project;
 			this.projectIndex = CCorePlugin.getIndexManager().getIndex(cproject);			
@@ -109,7 +110,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 		// get AST
 		IASTTranslationUnit ast = tu.getAST(index, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
 //		IASTTranslationUnit ast = tu.getAST();//, ITranslationUnit.AST_SKIP_INDEXED_HEADERS);
-		ast.accept(this);
+//		ast.accept(this);
 		return ast;
 	}	
 				
@@ -123,19 +124,26 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 	//// Epsilon specific functions
 	///////////////////////////////////////////////
 	
-	protected Collection<Object> getAllofKind(String kind){
+	@Override
+	public Collection<Object> getAllofKind(String kind, boolean visitAST){
 		checkOfKind = true;
-		return getAllVisitor(kind);
-	}
+		if (visitAST)
+			return getAllVisitorAST(kind);
+		else
+			return getAllVisitorModel(kind);	}
 	
 	
-	protected Collection<Object> getAllofType(String type){
+	@Override
+	public Collection<Object> getAllofType(String type, boolean visitAST){
 		checkOfKind = false;
-		return getAllVisitor(type);
+		if (visitAST)
+			return getAllVisitorAST(type);
+		else
+			return getAllVisitorModel(type);
 	}
 	
 	
-	private  Collection<Object> getAllVisitor(String type){
+	private  Collection<Object> getAllVisitorAST(String type){
 		List<Object> nodes = new ArrayList<Object>();
 		try {
 			for (ITranslationUnit tu : tuList){
@@ -185,6 +193,51 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 			e.printStackTrace();
 		}
 		return nodes;		
+	}
+	
+	
+	private  Collection<Object> getAllVisitorModel(String type){
+		List<Object> elements = new ArrayList<Object>();
+		try {
+			for (ITranslationUnit tu : tuList){
+				//check if tu is null
+				if (tu == null){
+					Shell shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();
+					MessageDialog.openInformation( shell, "Unexpected error in translation unit", "Unexpected error in translation unit (NULL)");
+					throw new NullPointerException("Unexpected error in translation unit (NULL)");
+				}
+				
+				tu.accept(new ICElementVisitor() {
+					@Override
+					public boolean visit(ICElement element) throws CoreException {
+						if (element.getClass().getSimpleName().equals(type))
+							elements.add(element);
+						else if (checkNode(element.getClass().getInterfaces(), type)){
+							elements.add(element);
+						}
+						else if (checkOfKind){
+							Class<?> superClass = element.getClass().getSuperclass();
+							while (superClass != Object.class) {
+								if (superClass.getSimpleName().equals(type)) {
+									elements.add(element);
+									break;
+								}
+								else if (checkNode(superClass.getInterfaces(), type)){
+									elements.add(element);
+									break;
+								}
+								superClass = superClass.getSuperclass();
+							}
+						}
+						return true;
+					}
+				});
+			}
+		} 
+		catch (CoreException e) {
+			e.printStackTrace();
+		}
+		return elements;		
 	}
 	
 	private boolean checkNode(Class<?>[] interfacesArrays, String type ){
@@ -246,7 +299,7 @@ public class ReflectiveASTVisitor extends ASTGenericVisitor {
 	
 	////////////////////////////////////////////////////////
 	//
-	//Reduntant functions
+	//Redundant functions
 	//
 	////////////////////////////////////////////////////////
 //	/**
